@@ -10,21 +10,24 @@ export function Overview() {
   const s = useStore(); const { db } = s; const [reset, setReset] = useState(false);
   const notes = attention(db);
   const roles = ['Company Admin', 'Supervisor', 'Office Admin', 'Landlord', 'Tenant', 'Applicant', 'Letting agent', 'Contractor'] as const;
+  const paused = db.reminders.filter(r => !r.on).length; const locked = db.users.filter(u => u.status === 'Locked').length;
   const tiles = [
-    { r: 'areas' as const, ic: MapPinned, n: `${db.areas.filter(a => a.status === 'Live').length} live`, l: `Areas · ${db.areas.filter(a => a.status === 'Planned').length} opening soon` },
-    { r: 'users' as const, ic: UsersIc, n: db.users.filter(u => u.status === 'Active').length, l: `Users active · ${db.users.length} in all` },
-    { r: 'plans' as const, ic: BadgePercent, n: db.plans.length, l: 'Plans on offer' },
-    { r: 'services' as const, ic: Wrench, n: db.services.filter(x => x.on).length, l: 'Services offered' },
-    { r: 'reminders' as const, ic: BellRing, n: `${db.reminders.filter(r => r.on).length} on`, l: `Reminders · ${db.reminders.filter(r => !r.on).length} paused` },
-    { r: 'templates' as const, ic: MessageSquareText, n: db.templates.length, l: 'Message templates' },
-    { r: 'checklists' as const, ic: ListChecks, n: db.checklists.length, l: 'Checklists' },
-    { r: 'roles' as const, ic: ShieldCheck, n: db.roles.length, l: 'Roles with permissions' },
+    { r: 'areas' as const, ic: MapPinned, tone: 'brand', l: 'Live areas', n: db.areas.filter(a => a.status === 'Live').length, sub: `${db.areas.filter(a => a.status === 'Planned').length} opening`, st: 'info' },
+    { r: 'users' as const, ic: UsersIc, tone: 'info', l: 'Active users', n: db.users.filter(u => u.status === 'Active').length, sub: locked ? `${locked} locked` : `of ${db.users.length}`, st: locked ? 'err' : '' },
+    { r: 'plans' as const, ic: BadgePercent, tone: 'brand', l: 'Plans', n: db.plans.length, sub: `${db.plans.filter(p => p.web).length} on website`, st: '' },
+    { r: 'services' as const, ic: Wrench, tone: 'ok', l: 'Services', n: db.services.filter(x => x.on).length, sub: `of ${db.services.length}`, st: '' },
+    { r: 'reminders' as const, ic: BellRing, tone: 'warn', l: 'Reminders on', n: db.reminders.filter(r => r.on).length, sub: paused ? `${paused} paused` : 'all on', st: paused ? 'warn' : 'ok' },
+    { r: 'templates' as const, ic: MessageSquareText, tone: 'info', l: 'Messages', n: db.templates.length, sub: `${db.templates.filter(t => !t.on).length} off`, st: '' },
+    { r: 'checklists' as const, ic: ListChecks, tone: 'ok', l: 'Checklists', n: db.checklists.length, sub: `${db.checklists.reduce((a, c) => a + c.items.length, 0)} items`, st: '' },
+    { r: 'roles' as const, ic: ShieldCheck, tone: 'brand', l: 'Roles', n: db.roles.length, sub: 'with permissions', st: '' },
   ];
   return <>
     <Head r="overview" />
-    <Card title="At a glance">
-      <div className="ovgrid">{tiles.map(t => { const Ic = t.ic; return <button key={t.r} className="ovtile" onClick={() => s.go(t.r)}><span><Ic size={15} />{t.l}</span><b>{t.n}</b></button>; })}</div>
-    </Card>
+    <div className="ovgrid">{tiles.map(t => { const Ic = t.ic; return <button key={t.r} className="ovtile" onClick={() => s.go(t.r)} aria-label={`${t.l}: ${t.n}`}>
+      <span className={`tile t-${t.tone}`}><Ic size={16} /></span>
+      <span className="ov-t"><span className="ov-l">{t.l}</span><span className="ov-v"><b>{t.n}</b><em className={t.st ? 'c-' + t.st : ''}>{t.sub}</em></span></span>
+      <ArrowRight size={14} className="ov-go" />
+    </button>; })}</div>
     <div className="grid g2">
       <Card title="Needs a look" action={<Chip tone={notes.length ? 'warn' : 'ok'}>{notes.length ? `${notes.length} things` : 'All clear'}</Chip>}>
         {notes.length ? <div>{notes.slice(0, 8).map((n, i) => <button key={i} className="rowlink" onClick={() => s.go(n.r, n.id)}>
