@@ -31,7 +31,7 @@ The client has approved this design. When editing:
 ## Company Admin rules (this portal)
 - Signed in as `ME_NAME` = Michael Grant (`src/data.ts`). Demo login: any email/password, code `123456`. 5 wrong codes lock the account. Session key `genesis-ca-signed-in`.
 - Only set-up that matches what the other portals already do. Nothing extra.
-- All set-up lives in one store (`src/store.tsx`, `Db`), seeded from `src/seed.ts` and kept in **sessionStorage** (`genesis-ca-db-v1`). **Reset demo data** is in the sidebar account menu (⋮) and on the Overview.
+- All set-up lives in one store (`src/store.tsx`, `Db`), seeded from `src/seed.ts` and kept in **sessionStorage** (`genesis-ca-db-v2`). **Reset demo data** is in the sidebar account menu (⋮) and on the Overview.
 - `commit(key, next, change)` saves one part and writes an **Audit history** entry (who, when, page, item, what, before → after, reason). `commitMany` saves several. Entries can never be edited or deleted.
 
 ## Rules every page follows (`src/admin.tsx`)
@@ -43,7 +43,7 @@ The client has approved this design. When editing:
 - Clear empty states, a toast after every action, calm plain wording.
 
 ## Sidebar (`NAV` in `src/Shell.tsx`) and pages (`src/pages/`)
-- **Overview** (`Overview.tsx`): at a glance, needs a look (`attention` in `lib.tsx`: locked users, areas with no Office Admin, agreement drafts, people still to accept, areas opening, paused reminders, messages off, unused invites), recent changes, agreement acceptance bars, areas, users by role, reset demo data.
+- **Overview** (`Overview.tsx`): at a glance, needs a look (`attention` in `lib.tsx`: locked users, areas with no Supervisor or Office Admins, homes that need an area, districts waiting to be shared, holiday cover, agreement drafts, people still to accept, areas opening, paused reminders, messages off, unused invites), recent changes, agreement acceptance bars, areas, users by role, reset demo data.
 - **Business**
   - Company details (`Business.tsx › Company`): name, company number, address, contact, the Outlook sending mailbox, payment terms, bank details on invoices (reason), logo upload, email signature with live email and LSP paper previews.
   - Areas (`Areas.tsx`): **Supervisor areas**, from the agreed proposal "Supervisor areas and holiday cover" (28 Oct 2026). London is split into areas by postcode district (1 North & North West, base N2 9RF · 2 West & South West · 3 North East & East · 4 South & South East). **Each area has ONE Supervisor and its own team of Office Admins** (`supervisor`, `oas` on `Area`). A Supervisor sees only their own area; only the Admin sees every area. Tabs: **Supervisor areas** (area cards, "Check a postcode" with exact matching: N2 9RF → N2, N20 is not N2, E1W is not E1), **Needs an area** (homes whose postcode matched no area or more than one; the Admin places them, optionally adding the district), **Shared districts** (requests to share a district until a date; only the Admin approves or rejects; sharing ends by itself; the main Supervisor stays responsible). Area page: Supervisor (one area each), Office Admins (one area each; picking one from another area moves them), postcode districts with the **District already taken** pop-up (Cancel / Transfer with the homes that move / Share until a date), status, opening date, website message, waiting list, who sees this area. A live area needs a Supervisor, Office Admins and districts; an area with homes can't be deleted. Store helpers: `districtOf`, `areasFor`, `homesOf`, `personName`, `staffOptions`.
