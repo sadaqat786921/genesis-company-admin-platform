@@ -1,0 +1,11 @@
+{
+  "title": "Genesis · Company Admin",
+  "description": "Landlord Service Plans — Genesis Company Admin portal: company details, areas, plans, services and products, VAT and tax, users, roles and permissions, teams, onboarding and KYC for every role, reminders, message templates, checklists, stages and pick-lists, document access, agreements, document templates and the audit history.",
+  "language": "en-GB",
+  "robots": {
+    "index": false
+  },
+  "icons": {
+    "icon": "favicon.svg"
+  }
+}

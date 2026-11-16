@@ -1,0 +1,105 @@
+import { useState } from 'react';
+import { UserPlus, Unlock, KeyRound, UserX, UserCheck, MailPlus, Users as UsersIc, ShieldCheck } from 'lucide-react';
+import { useStore } from '../store';
+import { nowStamp, ME_NAME } from '../data';
+import { Card, Chip, Btn, Field, Text, Select, Modal, Empty, Tabs, Facts, Note, Drawer, MiniSearch, Avatar, InfoTip } from '../ui';
+import { Head } from '../Shell';
+import { useDraft, SaveBar, ReasonModal, MultiPick } from '../admin';
+import { roleTone, statusTone } from './lib';
+import type { User, Role } from '../seed';
+
+type TabId = 'staff' | 'Landlord' | 'Tenant' | 'Letting agent' | 'Contractor' | 'all';
+const STAFF_ROLES: Role[] = ['Company Admin', 'Supervisor', 'Office Admin'];
+const isStaff = (u: User) => STAFF_ROLES.includes(u.role);
+const inTab = (u: User, t: TabId) => t === 'all' || (t === 'staff' ? isStaff(u) : t === 'Tenant' ? ['Tenant', 'Applicant'].includes(u.role) : u.role === t);
+
+/** People › Users: every login across the six portals. Invite staff, disable or enable, reset passwords and unlock accounts. */
+export function Users() {
+  const s = useStore(); const { db } = s;
+  const [tab, setTab] = useState<TabId>('staff'); const [q, setQ] = useState(''); const [st, setSt] = useState('all'); const [ar, setAr] = useState('all'); const [inv, setInv] = useState(false);
+  const list = db.users.filter(u => inTab(u, tab) && (st === 'all' || u.status === st) && (ar === 'all' || u.areas.includes(ar)) && (u.name + ' ' + u.email + ' ' + (u.org ?? '')).toLowerCase().includes(q.toLowerCase()));
+  const open = s.detail ? db.users.find(u => u.id === s.detail) : null;
+  const n = (t: TabId) => db.users.filter(u => inTab(u, t)).length;
+  const areaName = (id: string) => db.areas.find(a => a.id === id)?.name ?? id;
+  return <>
+    <Head r="users" action={<Btn icon={<UserPlus size={16} />} onClick={() => setInv(true)}>Invite a staff member</Btn>} />
+    <Card title={<span className="clean-h">Everyone who can sign in<InfoTip>Staff are invited here. Landlords, tenants, letting agents and contractors get their login from the flows in the Supervisor and Office Admin portals; here you can unlock, reset, disable or enable them.</InfoTip></span>}
+      action={<Tabs value={tab} onChange={setTab} items={[{ id: 'staff', label: 'Staff', count: n('staff') }, { id: 'Landlord', label: 'Landlords', count: n('Landlord') }, { id: 'Tenant', label: 'Tenants', count: n('Tenant') }, { id: 'Letting agent', label: 'Letting agents', count: n('Letting agent') }, { id: 'Contractor', label: 'Contractors', count: n('Contractor') }, { id: 'all', label: 'All', count: db.users.length }]} />}>
+      <div className="toolbar">
+        <MiniSearch value={q} onChange={setQ} placeholder="Search name, email or company" />
+        <select className="fsel" aria-label="Status" value={st} onChange={e => setSt(e.target.value)}><option value="all">Any status</option>{['Active', 'Invited', 'Locked', 'Disabled'].map(x => <option key={x}>{x}</option>)}</select>
+        <select className="fsel" aria-label="Area" value={ar} onChange={e => setAr(e.target.value)}><option value="all">All areas</option>{db.areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+        <span className="caption">{list.length} shown</span>
+      </div>
+      {list.length ? <div className="tablewrap"><table className="t"><thead><tr><th>Name</th><th>Role</th><th>Areas</th><th>Status</th><th>Last signed in</th><th>Security code</th></tr></thead><tbody>
+        {list.map(u => <tr key={u.id} onClick={() => s.go('users', u.id)}>
+          <td><span className="flex" style={{ gap: 10 }}><Avatar name={u.name} /><span className="stack"><b className="strong">{u.name}</b><span className="caption">{u.email}</span></span></span></td>
+          <td><span className="stack"><Chip tone={roleTone(u.role)}>{u.role}</Chip>{(u.sub || u.org) && <span className="caption">{[u.sub, u.org].filter(Boolean).join(' · ')}</span>}</span></td>
+          <td className="small">{u.areas.length > 2 ? `${u.areas.length} areas` : u.areas.map(areaName).join(', ') || '—'}</td>
+          <td><Chip tone={statusTone(u.status)}>{u.status}</Chip></td><td className="small">{u.last}</td><td className="small">{u.twoStep ? 'On' : 'Not set up'}</td>
+        </tr>)}
+      </tbody></table></div> : <Empty icon={<UsersIc size={22} />}>No one matches. Clear the search or filters.</Empty>}
+    </Card>
+    {inv && <Invite onClose={() => setInv(false)} />}
+    {open && <UserDrawer u={open} onClose={() => s.go('users')} />}
+  </>;
+}
+
+function Invite({ onClose }: { onClose: () => void }) {
+  const s = useStore(); const { db } = s;
+  const staffRoles = db.roles.filter(r => r.kind === 'staff').map(r => r.name);
+  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [role, setRole] = useState('Office Admin'); const [areas, setAreas] = useState<string[]>([]);
+  const dup = db.users.some(u => u.email.toLowerCase() === email.trim().toLowerCase());
+  const ok = name.trim().includes(' ') && /^\S+@\S+\.\S+$/.test(email) && !dup && (role !== 'Office Admin' || areas.length);
+  const names = db.areas.map(a => a.name);
+  return <Modal title="Invite a staff member" sub="They get an email from Outlook to set a password and their security code." onClose={onClose} footer={<><Btn kind="outline" onClick={onClose}>Cancel</Btn><Btn icon={<MailPlus size={16} />} disabled={!ok} onClick={() => {
+    const ids = areas.map(n => db.areas.find(a => a.name === n)!.id);
+    const u: User = { id: 'U' + Date.now(), name: name.trim(), email: email.trim().toLowerCase(), phone: '', role: (STAFF_ROLES.includes(role as Role) ? role : 'Office Admin') as Role, sub: STAFF_ROLES.includes(role as Role) ? undefined : role, areas: role === 'Office Admin' ? ids : db.areas.map(a => a.id), status: 'Invited', last: '—', twoStep: false, created: nowStamp(), logins: [] };
+    s.commit('users', [u, ...db.users], { page: 'Users', item: u.name, what: 'Invited a staff member', after: `${role}${areas.length ? ' · ' + areas.join(', ') : ''}` }, `Invite sent to ${u.email}`); onClose();
+  }}>Send invite</Btn></>}>
+    <div className="grid g2"><Field label="Full name"><Text value={name} onChange={setName} /></Field><Field label="Work email"><Text value={email} onChange={setEmail} placeholder="name@lsp.co.uk" /></Field></div>
+    {dup && <Note tone="err">Someone already uses this email.</Note>}
+    <Field label="Role"><Select value={role} onChange={setRole} options={staffRoles.map(r => ({ value: r, label: r }))} /></Field>
+    {role === 'Office Admin' ? <Field label="Areas they look after"><MultiPick label="Areas" options={names} value={areas} onChange={setAreas} /></Field> : <Note>{role} sees every area.</Note>}
+  </Modal>;
+}
+
+function UserDrawer({ u, onClose }: { u: User; onClose: () => void }) {
+  const s = useStore(); const { db } = s;
+  const [act, setAct] = useState<'' | 'disable' | 'enable' | 'unlock' | 'reset' | 'resend'>('');
+  const staff = isStaff(u) || !!u.sub && !['Admin', 'Property manager', 'Accounts', 'Rent sharer'].includes(u.sub);
+  const names = db.areas.map(a => a.name);
+  const x = useDraft({ role: u.sub && staff ? u.sub : u.role as string, areas: u.areas.map(id => db.areas.find(a => a.id === id)?.name ?? id) });
+  const me = u.name === ME_NAME;
+  const set = (patch: Partial<User>, what: string, before: string, after: string, msg: string, reason?: string) => { s.commit('users', db.users.map(y => y.id === u.id ? { ...y, ...patch } : y), { page: 'Users', item: u.name, what, before, after, reason }, msg); setAct(''); };
+  const staffRoles = db.roles.filter(r => r.kind === 'staff').map(r => r.name);
+  return <Drawer title={u.name} sub={`${u.role}${u.sub ? ' · ' + u.sub : ''}${u.org ? ' · ' + u.org : ''}`} icon={<Avatar name={u.name} size="md" />} onClose={onClose}
+    footer={staff && !me ? <SaveBar dirty={x.dirty} onUndo={x.undo} important="Role and area changes change what this person can see and do." blocked={x.d.role === 'Office Admin' && !x.d.areas.length ? 'An Office Admin needs at least one area.' : ''}
+      onSave={reason => { const custom = !STAFF_ROLES.includes(x.d.role as Role); const ids = x.d.role === 'Office Admin' || custom ? x.d.areas.map(n => db.areas.find(a => a.name === n)!.id) : db.areas.map(a => a.id); set({ role: (custom ? 'Office Admin' : x.d.role) as Role, sub: custom ? x.d.role : undefined, areas: ids }, 'Changed role or areas', `${u.sub ?? u.role} · ${u.areas.length} areas`, `${x.d.role} · ${x.d.areas.join(', ') || 'all areas'}`, 'Saved', reason); }} /> : undefined}>
+    <div className="flex wrap"><Chip tone={statusTone(u.status)}>{u.status}</Chip>{u.twoStep ? <Chip tone="ok">Security code on</Chip> : <Chip>Security code not set up</Chip>}</div>
+    {u.status === 'Locked' && <div className="alertbar a-err"><b className="grow">Locked after 5 wrong security codes.</b><Btn sm icon={<Unlock size={14} />} onClick={() => setAct('unlock')}>Unlock</Btn></div>}
+    {u.status === 'Invited' && <div className="alertbar a-info"><b className="grow">Hasn't set a password yet.</b><Btn sm kind="outline" icon={<MailPlus size={14} />} onClick={() => setAct('resend')}>Resend invite</Btn></div>}
+    <Facts items={[['Email', u.email], ['Phone', u.phone || '—'], ['Added', u.created], ['Last signed in', u.last]]} />
+    {staff && !me ? <Card title="Role and areas" className="flat">
+      <Field label="Role"><Select value={x.d.role} onChange={v => x.patch({ role: v })} options={staffRoles.map(r => ({ value: r, label: r }))} /></Field>
+      {x.d.role === 'Office Admin' || !STAFF_ROLES.includes(x.d.role as Role) ? <Field label="Areas they look after"><MultiPick label="Areas" options={names} value={x.d.areas} onChange={v => x.patch({ areas: v })} /></Field> : <Note>{x.d.role} sees every area.</Note>}
+      <Btn sm kind="ghost" icon={<ShieldCheck size={14} />} onClick={() => s.go('roles')}>See what this role can do</Btn>
+    </Card> : <Note>{me ? "This is you. Another Company Admin can change your role." : `${u.role} logins are created by the flows in the staff portals. You can unlock, reset, disable or enable this login.`}</Note>}
+    <div className="col" style={{ gap: 8 }}>
+      <b className="h2" style={{ fontSize: 13 }}>Login</b>
+      <div className="flex wrap">
+        {u.status === 'Active' && <Btn sm kind="outline" icon={<KeyRound size={14} />} onClick={() => setAct('reset')}>Send a password reset</Btn>}
+        {u.status !== 'Disabled' && !me && <Btn sm kind="outline" icon={<UserX size={14} />} onClick={() => setAct('disable')}>Disable login</Btn>}
+        {u.status === 'Disabled' && <Btn sm icon={<UserCheck size={14} />} onClick={() => setAct('enable')}>Enable login</Btn>}
+      </div>
+    </div>
+    <div className="col" style={{ gap: 6 }}><b className="h2" style={{ fontSize: 13 }}>Recent sign-ins</b>
+      {u.logins.length ? u.logins.slice(0, 5).map((l, i) => <div key={i} className="lrow"><div className="stack grow"><b className="small" style={{ color: 'var(--text-primary)' }}>{l}</b><span className="caption">Security code checked</span></div></div>) : <Empty>Never signed in.</Empty>}
+    </div>
+    {act === 'disable' && <ReasonModal danger title={`Disable ${u.name}'s login?`} sub={isStaff(u) ? 'They can’t sign in. Their work stays and can be given to someone else in Teams & areas.' : 'They can’t sign in. Their homes, jobs and records stay as they are.'} cta="Disable login" onClose={() => setAct('')} onDone={r => set({ status: 'Disabled' }, 'Disabled a user', u.status, 'Disabled', `${u.name} can't sign in now`, r)} />}
+    {act === 'enable' && <ReasonModal title={`Enable ${u.name}'s login?`} sub="They can sign in again with their password and security code." cta="Enable login" onClose={() => setAct('')} onDone={r => set({ status: 'Active' }, 'Enabled a user', 'Disabled', 'Active', `${u.name} can sign in again`, r)} />}
+    {act === 'unlock' && <ReasonModal title={`Unlock ${u.name}?`} sub="Check it is really them first, for example by calling the number we hold." cta="Unlock" onClose={() => setAct('')} onDone={r => set({ status: 'Active' }, 'Unlocked a user', 'Locked', 'Active', `${u.name} is unlocked`, r)} />}
+    {act === 'reset' && <Modal title="Send a password reset?" sub={`An email goes to ${u.email} with a link to set a new password. The old password stops working.`} onClose={() => setAct('')} footer={<><Btn kind="outline" onClick={() => setAct('')}>Cancel</Btn><Btn icon={<KeyRound size={16} />} onClick={() => set({}, 'Sent a password reset', '—', 'Reset email sent', `Reset email sent to ${u.email}`)}>Send reset email</Btn></>} />}
+    {act === 'resend' && <Modal title="Resend the invite?" sub={`A new link goes to ${u.email}. The old link stops working.`} onClose={() => setAct('')} footer={<><Btn kind="outline" onClick={() => setAct('')}>Cancel</Btn><Btn icon={<MailPlus size={16} />} onClick={() => set({ created: nowStamp() }, 'Resent an invite', u.created, nowStamp(), `Invite sent again to ${u.email}`)}>Resend</Btn></>} />}
+  </Drawer>;
+}

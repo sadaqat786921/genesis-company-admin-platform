@@ -1,0 +1,68 @@
+# Genesis · Company Admin (Figma Make)
+
+Clickable prototype of the **Company Admin** portal: the person who sets up the whole Genesis platform without a developer. Signed in as Michael Grant (Company Admin). It uses the same design system as the Supervisor (`sadaqat786921/genesis-supervisor-platform`), Office Admin, Landlord, Tenant, Letting Agent and Contractor portals for Landlord Service Plans (LSP): the client-approved design **"Dashboard Variation 04"** (Figma: Genesis page, node 342:2369, and the "Genesis · Design System" section). React 19 + Vite + TypeScript, running inside Figma Make.
+
+## Do not redesign
+The client has approved this design. When editing:
+- Keep the layout: a 264px white sidebar card on the left (logo, 5 menu groups, live counts, the user at the bottom), with content on the right inside 24px page padding and 20px gaps between blocks.
+- Keep the colours, font, radii and shadows listed below. Use the CSS variables in `src/styles/app.css` and never hard-code new colours.
+- Keep the existing classes and components (`.card`, `.kpi`, `.chip`, `.btn`, `Drawer`, `Modal`, `Tabs` and so on). Add new screens by reusing them.
+- Do not add Tailwind's base reset (preflight). `src/index.css` loads only Tailwind's theme and utilities, on purpose.
+- Tailwind utilities are switched on, so never name a custom class after a Tailwind utility (`outline`, `ring`, `shadow`, `border`, `hidden`…). That is why the outline button uses the class `.btn.line` and the dashboard ring uses `.gring`.
+- Do not swap the icon set (lucide-react, stroke width 1.8) or the font (Montserrat).
+- Images are relative paths under `public/images/` (`images/home1.jpg`). Keep them as normal git files, not LFS.
+- Besides React, only two packages are needed: `react-router-dom` and `lucide-react`. If an import fails, add the missing package to package.json — never delete screens or swap libraries.
+- Routing uses `HashRouter`. Paths look like `#/landlords/L1`.
+
+## Design tokens (`src/styles/app.css`)
+| Token | Value |
+|---|---|
+| Font | Montserrat 400/500/600/700/800 (self-hosted in `src/fonts`, loaded by `src/styles/fonts.css` — no font package needed) |
+| Page background | `#F3F5F9` |
+| Surface (cards) | `#FFFFFF`, border `#E9EDF3`, radius 22, padding 20, shadow `0 8px 24px rgba(15,24,40,.04)` |
+| Brand navy | `#153D91` (hover `#0F3279`, subtle `#EEF3FC`) |
+| Deep navy (hero / inverse) | `#001649` |
+| Accent green | `#5BAF00` |
+| Text | primary `#0F1828`, secondary `#475467`, tertiary `#667085`, placeholder `#98A2B3` |
+| Status | ok `#3C7300` / `#E8F4DB` · warning `#B54708` / `#FEF0C7` · error `#C8102E` / `#FDE8EB` · info `#0B6FB8` / `#E0F2FE` |
+| Radius | 6, 8, 10, 12 (buttons and inputs), 14, 20 (sidebar), 22 (cards), 24 (hero), 999 (chips) |
+| Type | H1 24/800 · H2 15/700 · metric 26/800 · body 13/500 · small 12.5/500 · caption 11/500 · hero number 56/800 |
+
+## Company Admin rules (this portal)
+- Signed in as `ME_NAME` = Michael Grant (`src/data.ts`). Demo login: any email/password, code `123456`. 5 wrong codes lock the account. Session key `genesis-ca-signed-in`.
+- Only set-up that matches what the other portals already do. Nothing extra.
+- All set-up lives in one store (`src/store.tsx`, `Db`), seeded from `src/seed.ts` and kept in **sessionStorage** (`genesis-ca-db-v1`). **Reset demo data** is in the sidebar account menu (⋮) and on the Overview.
+- `commit(key, next, change)` saves one part and writes an **Audit history** entry (who, when, page, item, what, before → after, reason). `commitMany` saves several. Entries can never be edited or deleted.
+
+## Rules every page follows (`src/admin.tsx`)
+- List → edit → **Undo / Save** (`useDraft` + the sticky `SaveBar`). Nothing is saved until Save.
+- **Important changes ask for a short reason** (`important` on `SaveBar`, `ReasonModal`): permissions, agreements, plans, VAT and tax, bank details, who sees documents, switching things off, opening/closing an area, moving landlords, onboarding requirements.
+- Deleting always asks for a reason (`DeleteModal`). Things in use can't be deleted (areas with homes, plans with landlords, used products, roles with people): the pop-up says what to do instead.
+- Locked parts (`Locked` chip with ⓘ) come from the client's flow chart or the law: they can be read, sometimes reworded, but not changed or removed.
+- Other helpers: `Toggle`, `MultiPick`, `ChipsInput`, `ListEditor` (rename, up/down, remove, keep a minimum, add), `TokenFields` (click a {detail} to put it where the cursor is), `fill` (sample values), `Paper` (LSP paper preview), `downloadCsv`, `changed` (before/after text), `smsCount`.
+- Clear empty states, a toast after every action, calm plain wording.
+
+## Sidebar (`NAV` in `src/Shell.tsx`) and pages (`src/pages/`)
+- **Overview** (`Overview.tsx`): at a glance, needs a look (`attention` in `lib.tsx`: locked users, areas with no Office Admin, agreement drafts, people still to accept, areas opening, paused reminders, messages off, unused invites), recent changes, agreement acceptance bars, areas, users by role, reset demo data.
+- **Business**
+  - Company details (`Business.tsx › Company`): name, company number, address, contact, the Outlook sending mailbox, payment terms, bank details on invoices (reason), logo upload, email signature with live email and LSP paper previews.
+  - Areas (`Areas.tsx`): Live / Opens on a date / Off; postcode districts (no overlaps), Office Admin and backup, the website message for areas not live, waiting list (export CSV, "Tell them we've opened"; opening an area tells the list), counts; delete only with no homes. Add an area.
+  - Plans (`Catalogue.tsx › Plans`): 10% Management Only, 12/16/20% with £150/£200/£300 job limits; plan page (fee, repairs covered, job limit, description, what's included, on the website, applies to new agreements from a date). Repair budget rule (20% of fee × 12, locked) and alert levels 70/90/100%. Add a plan (hidden until switched on).
+  - Services & prices: what LSP offers landlords and letting agents (group, trade, guide price, how often), on/off with a reason, drawer editor.
+  - Products & codes: the saved list used by Create quote / invoice (`CATALOGUE`), unique codes, in use on/off, used items can't be deleted.
+  - VAT & tax (`Business.tsx › Tax`): VAT on LSP fees (off by default, needs a GB VAT number, rate, start date, price preview per plan) and overseas landlords' tax (rate, HMRC reference, reminder days, certificate deadline), change history.
+- **People**
+  - Users (`Users.tsx`): every login in all portals, tabs by kind, search, status and area filters. Invite staff (role, areas). Drawer: role and areas (staff only, reason), unlock, password reset, resend invite, disable/enable (reason), recent sign-ins. Other logins come from the staff flows.
+  - Roles & permissions (`Roles.tsx › Roles`): ticked matrix for LSP staff (Company Admin locked to all; flow-chart rules locked: only the Supervisor creates landlords, approves tenants, decides over-limit jobs, activates switches) and the letting agent team (Admin, Property manager, Accounts). Add a role from a copy. Other portals show what they can do (set by the portal).
+  - Teams & areas (`Roles.tsx › Teams`): workload per Office Admin, areas covered, move landlords and clients one by one or all from one person (reason; they are told by email).
+- **Onboarding** (`Onboarding.tsx`, one component for tenant, landlord, letting agent, contractor; data `ONBOARDING` in `seed.ts`): the join steps (locked), documents and checks (needed / optional / only if needed, who uploads, end date, reminder days, checked by, what happens when it ends, on/off; core ones locked), role rules (tenant affordability 30×, who gets full checks, holding deposit locked at 1 week, keep rejected files 6 months; landlord duplicate check and overseas question; agent payment terms, order numbers, quote validity, cost never shown; contractor insurance minimum £2m, DBS maximum age 3 years, pay day), the trade registration table, "ask people already on the platform" and a phone preview.
+- **Messages & work**
+  - Reminders (`Reminders.tsx`): about 30 reminders grouped by kind (who, how, when as number + days/hours + before/after + which date, repeat, message template, on/off with a reason). Add, edit, pause, delete. **Late work** tab: "flag as late after N days" per stage (same data as Stages).
+  - Message templates (`Templates.tsx`): about 50 emails, texts and in-app alerts (who, when, last changed, on/off; "Needed" ones can only be reworded). Editor with clickable details, unknown details block saving, text length and number of texts, preview with a sample record, Send me a test, the reminders that use it.
+  - Checklists (`Checklists.tsx`): inspections (move-in, routine, move-out), gas safety, finish the job, Planned Switch handover, tenant and contractor document checks, new managed home. Items (add, rename, up/down, required/optional, remove), rules as drop-downs, phone preview. Saving makes a new version; work already started keeps its version.
+  - Stages & lists (`Stages.tsx`): stages for Lettings, Jobs (managed and client), Planned Switch, Enquiries, Move-out and Contractor sign-up (staff name, customer wording, show to customer, late after; core stages locked, optional stages can be added, moved and removed) and pick-lists (reasons, repair types, sources, urgency, damage types, trades…; keep at least 2).
+- **Documents & records**
+  - Document access (`Documents.tsx › Access`): each document type and who sees it (landlord, tenant, letting agent, contractor) and when it appears; "Never" cells and staff-only documents are locked. Add a document type.
+  - Agreements (`Agreements.tsx`): landlord management agreement, tenant portal terms, letting agent terms, contractor agreement, health and safety rules, privacy notice. Versions (Draft / Live / Retired), start a new version, edit sections, preview, publish (everyone accepts again or only new people), delete a draft, read old versions, who accepted which version with filters and CSV export.
+  - Document templates (`Documents.tsx › DocTemplates`): quote, invoice, job report, Property Management Plan, statement, remittance, damage quote, rent reminder, deposit return, tax certificate, welcome letter. Versions per template, set the default, wording with details, preview on LSP paper.
+  - Audit history (`Audit.tsx`): search, filters (page, person, year), CSV export, entry drawer. Read only.
