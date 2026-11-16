@@ -14,10 +14,19 @@ export interface Company {
 }
 export interface Waiter { name: string; email: string; postcode: string; at: string; kind: 'Landlord' | 'Tenant' | 'Letting agent' }
 export interface Area {
-  id: string; name: string; postcodes: string[]; oa: string; backup: string; status: 'Live' | 'Planned' | 'Off'; opens: string;
+  id: string; /** Area number on the map (1–4). */ n: number; name: string; /** Where the Supervisor is based. */ base: string;
+  /** Postcode districts (the first part of the postcode). Each district belongs to one area. */ postcodes: string[];
+  /** The one Supervisor responsible for the area (staff id). */ supervisor: string; /** The area's own team of Office Admins (staff ids). One area each. */ oas: string[];
+  status: 'Live' | 'Planned' | 'Off'; opens: string;
   /** What people outside a live area see on the website. */ message: string;
-  homes: number; landlords: number; tenants: number; contractors: number; waitlist: Waiter[]; created: string;
+  tenants: number; contractors: number; waitlist: Waiter[]; created: string;
 }
+/** A request to share a district with a second area for a while. Only the Admin approves; a Supervisor can never widen their own access. */
+export interface ShareReq { id: string; district: string; owner: string; to: string; by: string; reason: string; until: string; at: string; status: 'Waiting' | 'Approved' | 'Rejected' | 'Ended'; decided?: string }
+/** Holiday cover: another Supervisor gets temporary access to an area with their own login. It ends by itself. */
+export interface Cover { id: string; area: string; absent: string; cover: string; from: string; to: string; canDecide: boolean; absentReadOnly: boolean; by: string; at: string; ended?: string }
+/** A home or enquiry whose postcode matched no area, or more than one. It waits here until the Admin places it. */
+export interface Unmatched { id: string; address: string; postcode: string; source: 'Website enquiry' | 'Added by staff' | 'Import'; at: string; why: string }
 export interface Plan { id: string; name: string; fee: number; limit: number | null; budget: boolean; included: string[]; web: boolean; landlords: number; from: string; desc: string }
 export type SvcGroup = 'Safety checks' | 'Repairs' | 'Tenancy changeover' | 'Management';
 export interface Service { id: string; name: string; group: SvcGroup; to: ('Landlords' | 'Letting agents')[]; price: number; per: string; trade: string; on: boolean; desc: string; often?: string }
@@ -75,14 +84,29 @@ export const COMPANY: Company = {
 
 const w = (name: string, email: string, postcode: string, at: string, kind: Waiter['kind']): Waiter => ({ name, email, postcode, at, kind });
 export const AREAS: Area[] = [
-  { id: 'AR1', name: 'Islington', postcodes: ['N1', 'N5', 'N7', 'N19'], oa: 'et', backup: 'jc', status: 'Live', opens: '1 Jan 2026', message: '', homes: 6, landlords: 3, tenants: 7, contractors: 6, waitlist: [], created: '2 Dec 2025, 10:00' },
-  { id: 'AR2', name: 'Camden & Highgate', postcodes: ['NW1', 'NW5', 'N6'], oa: 'jc', backup: 'et', status: 'Live', opens: '1 Jan 2026', message: '', homes: 4, landlords: 2, tenants: 3, contractors: 5, waitlist: [], created: '2 Dec 2025, 10:05' },
-  { id: 'AR3', name: 'Haringey & Tottenham', postcodes: ['N8', 'N15', 'N17', 'N22'], oa: 'ps', backup: 'lm', status: 'Live', opens: '1 Feb 2026', message: '', homes: 5, landlords: 2, tenants: 3, contractors: 6, waitlist: [], created: '12 Jan 2026, 09:30' },
-  { id: 'AR4', name: 'Barnet & Finchley', postcodes: ['N2', 'N3', 'N12'], oa: 'lm', backup: 'ps', status: 'Live', opens: '1 Mar 2026', message: '', homes: 3, landlords: 1, tenants: 2, contractors: 4, waitlist: [], created: '10 Feb 2026, 14:00' },
-  { id: 'AR5', name: 'Enfield', postcodes: ['EN1', 'EN2', 'N9', 'N21'], oa: 'lm', backup: 'ps', status: 'Planned', opens: '1 Jan 2027', message: "We open in Enfield on 1 January 2027. Leave your details and we'll call you as soon as we start.", homes: 0, landlords: 0, tenants: 0, contractors: 2,
-    waitlist: [w('Grace Miller', 'grace.m@mail.co.uk', 'EN2 6LB', '3 Oct 2026, 18:40', 'Landlord'), w('Owen Clarke', 'owen.c@mail.co.uk', 'N21 1AB', '7 Oct 2026, 09:12', 'Landlord'), w('Hassan Ali', 'h.ali@mail.co.uk', 'EN1 3QT', '11 Oct 2026, 21:03', 'Tenant')], created: '1 Sep 2026, 11:20' },
-  { id: 'AR6', name: 'Hackney', postcodes: ['E5', 'E8', 'N16'], oa: '', backup: '', status: 'Off', opens: '', message: "We don't cover Hackney yet. Leave your details and we'll tell you when we do.", homes: 0, landlords: 0, tenants: 0, contractors: 1,
-    waitlist: [w('Mia Barker', 'mia.b@mail.co.uk', 'N16 7UJ', '28 Sep 2026, 12:30', 'Landlord'), w('Northfield Lets', 'office@northfieldlets.co.uk', 'E8 3PH', '9 Oct 2026, 10:05', 'Letting agent')], created: '20 Sep 2026, 16:00' },
+  { id: 'AR1', n: 1, name: 'North & North West', base: 'N2 9RF', supervisor: 'sk', oas: ['et', 'lm'], status: 'Live', opens: '1 Jan 2026', message: '', tenants: 6, contractors: 6, waitlist: [], created: '2 Dec 2025, 10:00',
+    postcodes: ['N2', 'N3', 'N6', 'N10', 'N11', 'N12', 'N14', 'N20', 'NW3', 'NW4', 'NW7', 'NW11', 'HA1', 'EN5'] },
+  { id: 'AR3', n: 3, name: 'North East & East', base: 'N1 0PQ', supervisor: 'mb', oas: ['jc', 'ps'], status: 'Live', opens: '1 Feb 2026', message: '', tenants: 7, contractors: 5, waitlist: [], created: '12 Jan 2026, 09:30',
+    postcodes: ['N1', 'N4', 'N5', 'N7', 'N8', 'N15', 'N16', 'N17', 'N19', 'N22', 'E8', 'EC2', 'IG1', 'RM1'] },
+  { id: 'AR2', n: 2, name: 'West & South West', base: '', supervisor: '', oas: ['nr'], status: 'Planned', opens: '1 Mar 2027', message: "We open in West and South West London in March 2027. Leave your details and we'll call you as soon as we start.", tenants: 0, contractors: 1, created: '1 Sep 2026, 11:20',
+    postcodes: ['W1', 'W5', 'SW6', 'SW19', 'TW9', 'KT1', 'UB8', 'SM1'],
+    waitlist: [w('Grace Miller', 'grace.m@mail.co.uk', 'W5 2LB', '3 Oct 2026, 18:40', 'Landlord'), w('Owen Clarke', 'owen.c@mail.co.uk', 'SW6 1AB', '7 Oct 2026, 09:12', 'Landlord'), w('Hassan Ali', 'h.ali@mail.co.uk', 'TW9 3QT', '11 Oct 2026, 21:03', 'Tenant')] },
+  { id: 'AR4', n: 4, name: 'South & South East', base: '', supervisor: '', oas: [], status: 'Off', opens: '', message: "We don't cover South London yet. Leave your details and we'll tell you when we do.", tenants: 0, contractors: 1, created: '20 Sep 2026, 16:00',
+    postcodes: ['SE1', 'SE10', 'BR1', 'CR0', 'DA5'],
+    waitlist: [w('Mia Barker', 'mia.b@mail.co.uk', 'SE10 7UJ', '28 Sep 2026, 12:30', 'Landlord'), w('Northfield Lets', 'office@northfieldlets.co.uk', 'CR0 3PH', '9 Oct 2026, 10:05', 'Letting agent')] },
+];
+export const SHARES: ShareReq[] = [
+  { id: 'SR1', district: 'N8', owner: 'AR3', to: 'AR1', by: 'Sarah Khan', reason: 'Two Highgate landlords bought homes in Hornsey. Keep the same Supervisor until their first tenancies end.', until: '31 Mar 2027', at: '14 Oct 2026, 11:05', status: 'Waiting' },
+  { id: 'SR2', district: 'N10', owner: 'AR1', to: 'AR3', by: 'Marcus Bell', reason: 'Muswell Hill handover while Liam was new.', until: '30 Jun 2026', at: '2 Mar 2026, 10:00', status: 'Ended', decided: 'Approved by Michael Grant · 2 Mar 2026' },
+];
+export const COVERS: Cover[] = [
+  { id: 'CV1', area: 'AR1', absent: 'sk', cover: 'mb', from: '2 Nov 2026', to: '9 Nov 2026', canDecide: true, absentReadOnly: true, by: 'Michael Grant', at: '12 Oct 2026, 15:20' },
+  { id: 'CV2', area: 'AR3', absent: 'mb', cover: 'sk', from: '17 Aug 2026', to: '28 Aug 2026', canDecide: true, absentReadOnly: true, by: 'Michael Grant', at: '1 Aug 2026, 09:00' },
+];
+export const UNMATCHED: Unmatched[] = [
+  { id: 'UM1', address: '3 Station Parade, Edmonton', postcode: 'N9 0EG', source: 'Website enquiry', at: '15 Oct 2026, 08:12', why: 'No area has N9' },
+  { id: 'UM2', address: 'Flat 7, 22 Wapping High Street', postcode: 'E1W 2NR', source: 'Website enquiry', at: '14 Oct 2026, 19:40', why: 'No area has E1W' },
+  { id: 'UM3', address: '18 Grove Road, Walthamstow', postcode: 'E17 9BU', source: 'Added by staff', at: '13 Oct 2026, 16:02', why: 'No area has E17' },
 ];
 
 /* ======================= plans, services, products, tax ======================= */
@@ -146,46 +170,48 @@ const u = (name: string, email: string, role: Role, status: UserStatus, last: st
   ({ id: 'U' + ++uid, name, email, phone: '07700 9' + String(10000 + uid * 137).slice(-5), role, status, last, areas, twoStep: true, created: '2 Jan 2026, 10:00', logins: last === '—' ? [] : [last], ...o });
 export const USERS: User[] = [
   u('Michael Grant', 'm.grant@lsp.co.uk', 'Company Admin', 'Active', '15 Oct 2026, 08:41', ['AR1', 'AR2', 'AR3', 'AR4'], { phone: '020 7946 0002', created: '1 Dec 2025, 09:00' }),
-  u('Sarah Khan', 's.khan@lsp.co.uk', 'Supervisor', 'Active', '15 Oct 2026, 08:55', ['AR1', 'AR2', 'AR3', 'AR4'], { phone: '020 7946 0001', created: '1 Dec 2025, 09:30' }),
+  u('Sarah Khan', 's.khan@lsp.co.uk', 'Supervisor', 'Active', '15 Oct 2026, 08:55', ['AR1'], { phone: '020 7946 0001', created: '1 Dec 2025, 09:30' }),
+  u('Marcus Bell', 'm.bell@lsp.co.uk', 'Supervisor', 'Active', '15 Oct 2026, 08:31', ['AR3'], { phone: '020 7946 0003', created: '5 Jan 2026, 09:00' }),
   u('Emma Thompson', 'e.thompson@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 09:02', ['AR1'], { phone: '020 7946 0011' }),
-  u('James Carter', 'j.carter@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 08:47', ['AR2'], { phone: '020 7946 0012' }),
+  u('James Carter', 'j.carter@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 08:47', ['AR1'], { phone: '020 7946 0012' }),
   u('Priya Shah', 'p.shah@lsp.co.uk', 'Office Admin', 'Active', '14 Oct 2026, 17:31', ['AR3'], { phone: '020 7946 0013' }),
-  u('Liam Murphy', 'l.murphy@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 09:15', ['AR4', 'AR5'], { phone: '020 7946 0014' }),
-  u('Nadia Rossi', 'n.rossi@lsp.co.uk', 'Office Admin', 'Invited', '—', ['AR5'], { created: '13 Oct 2026, 11:20', twoStep: false }),
+  u('Liam Murphy', 'l.murphy@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 09:15', ['AR1'], { phone: '020 7946 0014' }),
+  u('Nadia Rossi', 'n.rossi@lsp.co.uk', 'Office Admin', 'Invited', '—', ['AR2'], { created: '13 Oct 2026, 11:20', twoStep: false }),
   u('Ben Cole', 'b.cole@lsp.co.uk', 'Office Admin', 'Disabled', '30 Jun 2026, 16:02', [], { created: '5 Jan 2026, 10:00' }),
-  u('Margaret Okafor', 'm.okafor@mail.co.uk', 'Landlord', 'Active', '14 Oct 2026, 20:12', ['AR2']),
+  u('Margaret Okafor', 'm.okafor@mail.co.uk', 'Landlord', 'Active', '14 Oct 2026, 20:12', ['AR1']),
   u('David Hughes', 'd.hughes@mail.co.uk', 'Landlord', 'Active', '14 Oct 2026, 09:22', ['AR3']),
-  u('Rachel Evans', 'r.evans@mail.co.uk', 'Landlord', 'Active', '11 Oct 2026, 13:40', ['AR1']),
+  u('Rachel Evans', 'r.evans@mail.co.uk', 'Landlord', 'Active', '11 Oct 2026, 13:40', ['AR3']),
   u('Tom Ahmed', 't.ahmed@mail.co.uk', 'Landlord', 'Active', '9 Oct 2026, 07:58', ['AR3']),
   u('Helen Brooks', 'h.brooks@mail.co.uk', 'Landlord', 'Locked', '13 Oct 2026, 22:05', ['AR3']),
-  u('Karen Patel', 'k.patel@mail.co.uk', 'Landlord', 'Active', '14 Oct 2026, 15:12', ['AR2']),
-  u('Simon Wright', 's.wright@mail.co.uk', 'Landlord', 'Active', '2 Oct 2026, 19:44', ['AR1']),
-  u('Fiona Clarke', 'f.clarke@mail.co.uk', 'Landlord', 'Invited', '—', ['AR4'], { created: '13 Oct 2026, 10:00', twoStep: false }),
-  u('Daniel Price', 'd.price@mail.co.uk', 'Tenant', 'Active', '14 Oct 2026, 21:30', ['AR2']),
-  u('Michael Okafor', 'mike.okafor@mail.co.uk', 'Tenant', 'Active', '12 Oct 2026, 08:10', ['AR2']),
+  u('Karen Patel', 'k.patel@mail.co.uk', 'Landlord', 'Active', '14 Oct 2026, 15:12', ['AR1']),
+  u('Simon Wright', 's.wright@mail.co.uk', 'Landlord', 'Active', '2 Oct 2026, 19:44', ['AR3']),
+  u('Fiona Clarke', 'f.clarke@mail.co.uk', 'Landlord', 'Invited', '—', ['AR1'], { created: '13 Oct 2026, 10:00', twoStep: false }),
+  u('Daniel Price', 'd.price@mail.co.uk', 'Tenant', 'Active', '14 Oct 2026, 21:30', ['AR1']),
+  u('Michael Okafor', 'mike.okafor@mail.co.uk', 'Tenant', 'Active', '12 Oct 2026, 08:10', ['AR1']),
   u('Jay Patel', 'jay.patel@mail.co.uk', 'Tenant', 'Active', '10 Oct 2026, 18:22', ['AR3']),
-  u('Liz Brown', 'liz.brown@mail.co.uk', 'Tenant', 'Active', '8 Oct 2026, 12:00', ['AR1']),
+  u('Liz Brown', 'liz.brown@mail.co.uk', 'Tenant', 'Active', '8 Oct 2026, 12:00', ['AR3']),
   u('Megan Price', 'megan.p@mail.co.uk', 'Tenant', 'Active', '14 Oct 2026, 07:45', ['AR3']),
-  u('Kofi Mensah', 'kofi.m@mail.co.uk', 'Tenant', 'Disabled', '30 Sep 2026, 10:12', ['AR1']),
+  u('Kofi Mensah', 'kofi.m@mail.co.uk', 'Tenant', 'Disabled', '30 Sep 2026, 10:12', ['AR3']),
   u('Aisha Rahman', 'aisha.r@mail.co.uk', 'Applicant', 'Active', '14 Oct 2026, 20:50', ['AR3']),
   u('Omar Rahman', 'omar.r@mail.co.uk', 'Applicant', 'Invited', '—', ['AR3'], { sub: 'Rent sharer', twoStep: false, created: '14 Oct 2026, 21:02' }),
-  u('Claire Rose', 'claire@rosewoodlettings.co.uk', 'Letting agent', 'Active', '15 Oct 2026, 08:30', ['AR1'], { sub: 'Admin', org: 'Rosewood Lettings' }),
-  u('Tom Fielding', 'tom@rosewoodlettings.co.uk', 'Letting agent', 'Active', '14 Oct 2026, 16:20', ['AR1'], { sub: 'Property manager', org: 'Rosewood Lettings' }),
-  u('Anita Shah', 'accounts@rosewoodlettings.co.uk', 'Letting agent', 'Active', '12 Oct 2026, 11:05', ['AR1'], { sub: 'Accounts', org: 'Rosewood Lettings' }),
+  u('Claire Rose', 'claire@rosewoodlettings.co.uk', 'Letting agent', 'Active', '15 Oct 2026, 08:30', ['AR3'], { sub: 'Admin', org: 'Rosewood Lettings' }),
+  u('Tom Fielding', 'tom@rosewoodlettings.co.uk', 'Letting agent', 'Active', '14 Oct 2026, 16:20', ['AR3'], { sub: 'Property manager', org: 'Rosewood Lettings' }),
+  u('Anita Shah', 'accounts@rosewoodlettings.co.uk', 'Letting agent', 'Active', '12 Oct 2026, 11:05', ['AR3'], { sub: 'Accounts', org: 'Rosewood Lettings' }),
   u('Ian Walsh', 'ian@northgatehomes.co.uk', 'Letting agent', 'Active', '13 Oct 2026, 14:44', ['AR3'], { sub: 'Admin', org: 'Northgate Homes' }),
-  u('Lucy Green', 'lucy@citykeyagents.co.uk', 'Letting agent', 'Locked', '15 Oct 2026, 07:12', ['AR2'], { sub: 'Admin', org: 'City Key Agents' }),
-  u('Gary Holt', 'gary@heatright.co.uk', 'Contractor', 'Active', '15 Oct 2026, 07:30', ['AR1', 'AR2', 'AR3', 'AR4'], { org: 'HeatRight Ltd' }),
-  u('Dean Cole', 'dean@toptileroofing.co.uk', 'Contractor', 'Active', '13 Oct 2026, 18:10', ['AR2', 'AR3'], { org: 'TopTile Roofing' }),
-  u('Rita Singh', 'rita@securefix.co.uk', 'Contractor', 'Active', '11 Oct 2026, 09:40', ['AR1', 'AR2'], { org: 'SecureFix' }),
-  u('Neil Burke', 'neil@quickplumb.co.uk', 'Contractor', 'Active', '14 Oct 2026, 08:05', ['AR1', 'AR3', 'AR4'], { org: 'QuickPlumb' }),
-  u('Owen Price', 'owen@voltelectrical.co.uk', 'Contractor', 'Disabled', '20 Sep 2026, 17:00', ['AR3', 'AR4'], { org: 'Volt Electrical' }),
-  u('Clare Vine', 'clare@clearview.co.uk', 'Contractor', 'Active', '12 Oct 2026, 10:30', ['AR1', 'AR2', 'AR3', 'AR4'], { org: 'Clear View Inspections' }),
-  u('Fred Ince', 'fred@fixitcarpentry.co.uk', 'Contractor', 'Active', '9 Oct 2026, 12:12', ['AR1', 'AR4'], { org: 'FixIt Carpentry' }),
+  u('Lucy Green', 'lucy@citykeyagents.co.uk', 'Letting agent', 'Locked', '15 Oct 2026, 07:12', ['AR1'], { sub: 'Admin', org: 'City Key Agents' }),
+  u('Gary Holt', 'gary@heatright.co.uk', 'Contractor', 'Active', '15 Oct 2026, 07:30', ['AR3', 'AR1'], { org: 'HeatRight Ltd' }),
+  u('Dean Cole', 'dean@toptileroofing.co.uk', 'Contractor', 'Active', '13 Oct 2026, 18:10', ['AR1', 'AR3'], { org: 'TopTile Roofing' }),
+  u('Rita Singh', 'rita@securefix.co.uk', 'Contractor', 'Active', '11 Oct 2026, 09:40', ['AR3', 'AR1'], { org: 'SecureFix' }),
+  u('Neil Burke', 'neil@quickplumb.co.uk', 'Contractor', 'Active', '14 Oct 2026, 08:05', ['AR3', 'AR1'], { org: 'QuickPlumb' }),
+  u('Owen Price', 'owen@voltelectrical.co.uk', 'Contractor', 'Disabled', '20 Sep 2026, 17:00', ['AR3', 'AR1'], { org: 'Volt Electrical' }),
+  u('Clare Vine', 'clare@clearview.co.uk', 'Contractor', 'Active', '12 Oct 2026, 10:30', ['AR3', 'AR1'], { org: 'Clear View Inspections' }),
+  u('Fred Ince', 'fred@fixitcarpentry.co.uk', 'Contractor', 'Active', '9 Oct 2026, 12:12', ['AR3', 'AR1'], { org: 'FixIt Carpentry' }),
 ];
 
 export const PERMS: Perm[] = [
-  { id: 'homes.all', group: 'Homes and people', label: 'See every area, landlord and home' },
-  { id: 'homes.own', group: 'Homes and people', label: 'See the landlords and homes given to them' },
+  { id: 'homes.all', group: 'Homes and people', label: 'See every area, landlord and home', core: 'Only the Admin sees every area' },
+  { id: 'homes.area', group: 'Homes and people', label: 'See every home in their own area', core: 'Each Supervisor sees only their own area' },
+  { id: 'homes.own', group: 'Homes and people', label: "See only their own work inside their Supervisor's area" },
   { id: 'll.create', group: 'Homes and people', label: 'Create landlords (after the duplicate check)', core: 'Only the Supervisor creates landlords' },
   { id: 'prop.add', group: 'Homes and people', label: 'Add properties and rooms' },
   { id: 'plan.change', group: 'Homes and people', label: "Change a landlord's plan" },
@@ -211,6 +237,7 @@ export const PERMS: Perm[] = [
   { id: 'rec.support', group: 'Records', label: 'Give the support team access' },
   { id: 'set.terms', group: 'Set-up', label: 'Edit the contractor agreement and rules' },
   { id: 'set.vat', group: 'Set-up', label: 'Change VAT and tax settings' },
+  { id: 'set.areas', group: 'Set-up', label: 'Create Supervisors, set areas, approve overlaps and holiday cover', core: 'Only the Admin. A Supervisor can never widen their own access' },
   { id: 'set.all', group: 'Set-up', label: 'Use the Company Admin portal', core: 'Only the Company Admin' },
 ];
 export const AGENT_PERMS: Perm[] = [
@@ -224,8 +251,8 @@ export const AGENT_PERMS: Perm[] = [
 const ALL_STAFF = PERMS.map(p => p.id);
 export const ROLES: RoleDef[] = [
   { id: 'R-CA', name: 'Company Admin', kind: 'staff', desc: 'Sets up the platform. Can do everything.', perms: ALL_STAFF, locked: true },
-  { id: 'R-SV', name: 'Supervisor', kind: 'staff', desc: 'Runs the business day to day and makes the decisions only a Supervisor can make.', perms: ALL_STAFF.filter(p => !['homes.own', 'set.all'].includes(p)) },
-  { id: 'R-OA', name: 'Office Admin', kind: 'staff', desc: 'Looks after the landlords, homes and work in their area.', perms: ['homes.own', 'prop.add', 'enq.handle', 'let.run', 'switch.run', 'job.price', 'job.under', 'job.finish', 'money.rent', 'money.docs', 'rec.lock'] },
+  { id: 'R-SV', name: 'Supervisor', kind: 'staff', desc: 'Runs one area with its own Office Admins, and makes the decisions only a Supervisor can make.', perms: ALL_STAFF.filter(p => !['homes.all', 'homes.own', 'set.areas', 'set.all'].includes(p)) },
+  { id: 'R-OA', name: 'Office Admin', kind: 'staff', desc: "Works in one Supervisor's area. Requests go to that Supervisor (or the cover).", perms: ['homes.own', 'prop.add', 'enq.handle', 'let.run', 'switch.run', 'job.price', 'job.under', 'job.finish', 'money.rent', 'money.docs', 'rec.lock'] },
   { id: 'R-AG-A', name: 'Admin', kind: 'agent', desc: "Letting agent team: the agency's main contact.", perms: AGENT_PERMS.map(p => p.id) },
   { id: 'R-AG-P', name: 'Property manager', kind: 'agent', desc: 'Letting agent team: books jobs and accepts quotes.', perms: ['ag.book', 'ag.accept', 'ag.homes'] },
   { id: 'R-AG-C', name: 'Accounts', kind: 'agent', desc: 'Letting agent team: pays invoices.', perms: ['ag.pay'] },
@@ -238,17 +265,17 @@ export const PORTAL_ROLES: { name: Role; can: string[] }[] = [
   { name: 'Contractor', can: ['See the jobs LSP gives them', 'Confirm visits, send photos and their invoice', 'Keep insurance, registration and DBS check in date', 'Add bank details (checked by phone)'] },
 ];
 export const LANDLORD_ROWS: LandlordRow[] = [
-  { id: 'L1', name: 'Margaret Okafor', area: 'AR2', admin: 'et', homes: 3, tasks: 4 },
+  { id: 'L1', name: 'Margaret Okafor', area: 'AR1', admin: 'et', homes: 3, tasks: 4 },
+  { id: 'L6', name: 'Karen Patel', area: 'AR1', admin: 'lm', homes: 2, tasks: 1 },
+  { id: 'L8', name: 'Fiona Clarke', area: 'AR1', admin: 'lm', homes: 1, tasks: 1 },
+  { id: 'A3', name: 'City Key Agents (client)', area: 'AR1', admin: 'et', homes: 1, tasks: 0 },
   { id: 'L2', name: 'David Hughes', area: 'AR3', admin: 'ps', homes: 2, tasks: 3 },
-  { id: 'L3', name: 'Rachel Evans', area: 'AR1', admin: 'jc', homes: 2, tasks: 1 },
-  { id: 'L4', name: 'Tom Ahmed', area: 'AR3', admin: 'lm', homes: 2, tasks: 2 },
-  { id: 'L5', name: 'Helen Brooks', area: 'AR3', admin: 'et', homes: 1, tasks: 2 },
-  { id: 'L6', name: 'Karen Patel', area: 'AR2', admin: 'ps', homes: 2, tasks: 1 },
-  { id: 'L7', name: 'Simon Wright', area: 'AR1', admin: 'jc', homes: 1, tasks: 2 },
-  { id: 'L8', name: 'Fiona Clarke', area: 'AR4', admin: 'lm', homes: 1, tasks: 1 },
-  { id: 'A1', name: 'Rosewood Lettings (client)', area: 'AR1', admin: 'et', homes: 4, tasks: 3 },
+  { id: 'L3', name: 'Rachel Evans', area: 'AR3', admin: 'jc', homes: 2, tasks: 1 },
+  { id: 'L4', name: 'Tom Ahmed', area: 'AR3', admin: 'jc', homes: 2, tasks: 2 },
+  { id: 'L5', name: 'Helen Brooks', area: 'AR3', admin: 'ps', homes: 1, tasks: 2 },
+  { id: 'L7', name: 'Simon Wright', area: 'AR3', admin: 'jc', homes: 1, tasks: 2 },
+  { id: 'A1', name: 'Rosewood Lettings (client)', area: 'AR3', admin: 'jc', homes: 4, tasks: 3 },
   { id: 'A2', name: 'Northgate Homes (client)', area: 'AR3', admin: 'ps', homes: 2, tasks: 1 },
-  { id: 'A3', name: 'City Key Agents (client)', area: 'AR2', admin: 'jc', homes: 1, tasks: 0 },
 ];
 
 /* ======================= onboarding and KYC ======================= */
@@ -399,7 +426,7 @@ export const TOKENS: Record<string, string> = {
   first_name: 'Daniel', full_name: 'Daniel Price', address: 'Flat 4, 19 Highgate Hill, N19 5NA', date: '21 Oct 2026', time: '10:30', amount: '£1,350', due_date: '1 Nov 2026',
   link: 'https://app.lsp.co.uk/r/8KQ2', reference: 'LSP-T14', bank_details: 'Barclays 20-45-77 43819902', paid: '£900', balance: '£450', month: 'October 2026',
   office_admin: 'James Carter', office_phone: '020 7946 0012', company: 'Rosewood Lettings', code: '482913', sender: 'Michael Grant', role: 'Office Admin',
-  area_message: "We open in Enfield on 1 January 2027.", missing_documents: 'proof of income, bank statements', applicant: 'Aisha Rahman', keep_months: '6',
+  area_message: "We open in West and South West London in March 2027.", missing_documents: 'proof of income, bank statements', applicant: 'Aisha Rahman', keep_months: '6',
   invoice_no: 'INV-1047', quote_no: 'Q-2411', job_no: 'J21', job_title: 'Kitchen tap dripping', contractor: 'QuickPlumb', covered: '£200', you_pay: '£480',
   certificate: 'gas safety certificate', document: 'public liability insurance', agreement: 'contractor agreement', version: '4', what_changed: 'Parts over £50 need a receipt',
   landlord: 'Margaret Okafor', tax_year: '2026 to 2027', current_agent: 'Northgate Homes', item: 'Application · Aisha Rahman', stage: 'LSP checks', days: '6', percent: '70%',
@@ -614,13 +641,14 @@ let aid = 0;
 const au = (at: string, who: string, page: string, item: string, what: string, before: string, after: string, reason?: string): AuditEntry => ({ id: 'AU' + String(++aid).padStart(3, '0'), at, who, page, item, what, before, after, reason });
 export const AUDIT: AuditEntry[] = [
   au('14 Oct 2026, 16:30', 'Michael Grant', 'Agreements', 'Letting agent terms of business', 'Started a new draft version', '—', 'Version 3 (draft)'),
-  au('13 Oct 2026, 11:20', 'Michael Grant', 'Users', 'Nadia Rossi', 'Invited a staff member', '—', 'Office Admin · Enfield', 'New Office Admin for Enfield'),
+  au('13 Oct 2026, 11:20', 'Michael Grant', 'Users', 'Nadia Rossi', 'Invited a staff member', '—', 'Office Admin · West & South West', 'First Office Admin for Area 2'),
   au('8 Oct 2026, 14:22', 'Sarah Khan', 'Message templates', 'Landlord welcome and set password', 'Changed the message', 'Your account is ready.', 'Welcome to LSP. Your account is ready.'),
   au('1 Oct 2026, 09:05', 'Michael Grant', 'Message templates', 'Rent due soon', 'Changed the message', 'Pay to the LSP account.', 'Pay to {bank_details} with reference {reference}.'),
-  au('20 Sep 2026, 16:00', 'Michael Grant', 'Areas', 'Hackney', 'Added an area', '—', 'Off · waiting list on', 'Agents asking about Hackney'),
+  au('20 Sep 2026, 16:00', 'Michael Grant', 'Areas', 'South & South East', 'Added an area', '—', 'Off · waiting list on', 'Agents asking about South London'),
   au('20 Sep 2026, 17:05', 'Michael Grant', 'Users', 'Owen Price', 'Disabled a user', 'Active', 'Disabled', 'Volt Electrical stopped working with LSP'),
   au('12 Sep 2026, 11:00', 'Sarah Khan', 'Checklists', 'Move-in inspection', 'Added an item', '7 items', '8 items · How the home works explained'),
-  au('1 Sep 2026, 11:20', 'Michael Grant', 'Areas', 'Enfield', 'Added an area', '—', 'Opens 1 Jan 2027', 'Opening Enfield in January'),
+  au('1 Sep 2026, 11:20', 'Michael Grant', 'Areas', 'West & South West', 'Added an area', '—', 'Opens 1 Mar 2027', 'Second Supervisor area'),
+  au('12 Oct 2026, 15:20', 'Michael Grant', 'Teams & cover', 'North & North West', 'Set holiday cover', '—', 'Marcus Bell covers for Sarah Khan, 2 to 9 Nov 2026', 'Sarah on annual leave'),
   au('1 Sep 2026, 09:00', 'Sarah Khan', 'Agreements', 'Contractor agreement', 'Published version 3', 'Version 2', 'Version 3 · everyone must accept again', 'Pay day moved to every Friday'),
   au('2 Jun 2026, 10:00', 'Sarah Khan', 'Checklists', 'Routine inspection', 'Changed a rule', 'How often: Every 3 months', 'How often: Every 6 months', 'Client decision'),
   au('30 Jun 2026, 16:05', 'Michael Grant', 'Users', 'Ben Cole', 'Disabled a user', 'Active', 'Disabled', 'Left the company'),

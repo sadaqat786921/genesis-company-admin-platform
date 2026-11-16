@@ -13,16 +13,16 @@ export const ROUTES: Route[] = ['overview', 'company', 'areas', 'plans', 'servic
 
 export interface Db {
   company: S.Company; areas: S.Area[]; plans: S.Plan[]; services: S.Service[]; products: S.Product[]; tax: S.Tax;
-  users: S.User[]; roles: S.RoleDef[]; landlords: S.LandlordRow[]; onboarding: Record<S.OnbRole, S.Onboarding>;
+  users: S.User[]; roles: S.RoleDef[]; landlords: S.LandlordRow[]; shares: S.ShareReq[]; covers: S.Cover[]; unmatched: S.Unmatched[]; onboarding: Record<S.OnbRole, S.Onboarding>;
   reminders: S.Reminder[]; templates: S.Template[]; checklists: S.Checklist[]; processes: S.Process[]; picklists: S.PickList[];
   docTypes: S.DocType[]; agreements: S.Agreement[]; docTemplates: S.DocTemplate[]; audit: S.AuditEntry[];
 }
 const seed = (): Db => JSON.parse(JSON.stringify({
-  company: S.COMPANY, areas: S.AREAS, plans: S.PLANS, services: S.SERVICES, products: S.PRODUCTS, tax: S.TAX, users: S.USERS, roles: S.ROLES, landlords: S.LANDLORD_ROWS,
+  company: S.COMPANY, areas: S.AREAS, plans: S.PLANS, services: S.SERVICES, products: S.PRODUCTS, tax: S.TAX, users: S.USERS, roles: S.ROLES, landlords: S.LANDLORD_ROWS, shares: S.SHARES, covers: S.COVERS, unmatched: S.UNMATCHED,
   onboarding: S.ONBOARDING, reminders: S.REMINDERS, templates: S.TEMPLATES, checklists: S.CHECKLISTS, processes: S.PROCESSES, picklists: S.PICKLISTS,
   docTypes: S.DOC_TYPES, agreements: S.AGREEMENTS, docTemplates: S.DOC_TEMPLATES, audit: S.AUDIT,
 }));
-const DB_KEY = 'genesis-ca-db-v1';
+const DB_KEY = 'genesis-ca-db-v2';
 function load(): Db { try { const r = sessionStorage.getItem(DB_KEY); if (r) return { ...seed(), ...JSON.parse(r) }; } catch { /* storage blocked */ } return seed(); }
 
 export interface Change { page: string; item: string; what: string; before?: string; after?: string; reason?: string }
@@ -73,3 +73,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 export const staff = (id?: string) => D.STAFF.find(s => s.id === id);
 export const money = (n: number): string => n < 0 ? '−' + money(-n) : '£' + n.toLocaleString('en-GB', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
 export const staffName = (id?: string) => staff(id)?.name ?? (id ? id : 'Nobody yet');
+/** The staff id used for a user (STAFF id when known, otherwise the user id). */
+export const staffIdOf = (u: S.User) => D.STAFF.find(x => x.name === u.name)?.id ?? u.id;
+/** Name for a staff id, including staff invited in this demo. */
+export const personName = (db: Db, id?: string) => !id ? 'Nobody yet' : staff(id)?.name ?? db.users.find(u => u.id === id)?.name ?? id;
+/** Staff of one role as select options. */
+export const staffOptions = (db: Db, role: 'Supervisor' | 'Office Admin') => db.users.filter(u => u.role === role && u.status !== 'Disabled').map(u => ({ value: staffIdOf(u), label: u.name + (u.status === 'Invited' ? ' (invited)' : '') }));
+/** Which area a staff member works in. */
+export const areaOfStaff = (db: Db, id: string) => db.areas.find(a => a.supervisor === id || a.oas.includes(id));
+/** Exact match of a full postcode to an area: the district is the first part, tidied up. N2 9RF → N2; N20 is not N2. */
+export const districtOf = (pc: string) => { const t = pc.toUpperCase().replace(/\s+/g, ' ').trim(); return (t.includes(' ') ? t.split(' ')[0] : t.length > 4 ? t.slice(0, -3) : t).replace(/\s/g, ''); };
+export const areasFor = (db: Db, pc: string) => { const d = districtOf(pc); return db.areas.filter(a => a.postcodes.includes(d) || db.shares.some(r => r.status === 'Approved' && r.district === d && r.to === a.id)); };
+export const homesOf = (db: Db, areaId: string) => db.landlords.filter(l => l.area === areaId).reduce((n, l) => n + l.homes, 0);
+export const landlordsOf = (db: Db, areaId: string) => db.landlords.filter(l => l.area === areaId).length;

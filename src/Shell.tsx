@@ -12,7 +12,7 @@ import { attention, draftOf } from './pages/lib';
 export const NAV: { group: string; items: { id: Route; label: string; icon: typeof Home }[] }[] = [
   { group: 'Overview', items: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }] },
   { group: 'Business', items: [{ id: 'company', label: 'Company details', icon: Building2 }, { id: 'areas', label: 'Areas', icon: MapPinned }, { id: 'plans', label: 'Plans', icon: BadgePercent }, { id: 'services', label: 'Services & prices', icon: Wrench }, { id: 'products', label: 'Products & codes', icon: Barcode }, { id: 'tax', label: 'VAT & tax', icon: Landmark }] },
-  { group: 'People', items: [{ id: 'users', label: 'Users', icon: Users }, { id: 'roles', label: 'Roles & permissions', icon: ShieldCheck }, { id: 'teams', label: 'Teams & areas', icon: Network }] },
+  { group: 'People', items: [{ id: 'users', label: 'Users', icon: Users }, { id: 'roles', label: 'Roles & permissions', icon: ShieldCheck }, { id: 'teams', label: 'Teams & cover', icon: Network }] },
   { group: 'Onboarding', items: [{ id: 'onb-tenant', label: 'Tenant onboarding', icon: KeyRound }, { id: 'onb-landlord', label: 'Landlord onboarding', icon: Home }, { id: 'onb-agent', label: 'Letting agent onboarding', icon: Briefcase }, { id: 'onb-contractor', label: 'Contractor onboarding', icon: HardHat }] },
   { group: 'Messages & work', items: [{ id: 'reminders', label: 'Reminders', icon: BellRing }, { id: 'templates', label: 'Message templates', icon: MessageSquareText }, { id: 'checklists', label: 'Checklists', icon: ListChecks }, { id: 'stages', label: 'Stages & lists', icon: Workflow }] },
   { group: 'Documents & records', items: [{ id: 'access', label: 'Document access', icon: FolderLock }, { id: 'agreements', label: 'Agreements', icon: ScrollText }, { id: 'doctemplates', label: 'Document templates', icon: FileText }, { id: 'audit', label: 'Audit history', icon: History }] },
@@ -24,7 +24,7 @@ export function useCounts() {
   const { db } = useStore();
   return {
     users: db.users.filter(u => u.status === 'Locked').length,
-    areas: db.areas.filter(a => a.status !== 'Off' && !a.oa).length,
+    areas: db.unmatched.length + db.shares.filter(r => r.status === 'Waiting').length,
     agreements: db.agreements.filter(a => draftOf(a)).length,
     reminders: db.reminders.filter(r => !r.on).length,
   } as Partial<Record<Route, number>>;
@@ -68,7 +68,7 @@ export function PageHeader({ title, action, crumbs, back }: { title: ReactNode; 
     const r: { label: string; sub: string; go: () => void }[] = [];
     NAV.flatMap(g => g.items).filter(i => i.label.toLowerCase().includes(t)).forEach(i => r.push({ label: i.label, sub: 'Page', go: () => s.go(i.id) }));
     db.users.filter(x => (x.name + ' ' + x.email + ' ' + (x.org ?? '')).toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: `User · ${x.role}`, go: () => s.go('users', x.id) }));
-    db.areas.filter(x => (x.name + ' ' + x.postcodes.join(' ')).toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: `Area · ${x.postcodes.join(', ')}`, go: () => s.go('areas', x.id) }));
+    db.areas.filter(x => (x.name + ' ' + x.postcodes.join(' ')).toLowerCase().includes(t)).forEach(x => r.push({ label: `Area ${x.n} · ${x.name}`, sub: `${x.postcodes.slice(0, 6).join(', ')}`, go: () => s.go('areas', x.id) }));
     db.templates.filter(x => (x.name + ' ' + x.subject).toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: `Message template · ${x.channel}`, go: () => s.go('templates', x.id) }));
     db.reminders.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: 'Reminder', go: () => s.go('reminders', x.id) }));
     db.checklists.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: 'Checklist', go: () => s.go('checklists', x.id) }));
@@ -80,7 +80,8 @@ export function PageHeader({ title, action, crumbs, back }: { title: ReactNode; 
   }, [q, s, db]);
   const notes = attention(db);
   const cal = [
-    ...db.areas.filter(a => a.status === 'Planned' && a.opens).map(a => ({ d: a.opens, t: `${a.name} opens`, p: `${a.waitlist.length} on the waiting list`, r: 'areas' as Route, id: a.id as string | null })),
+    ...db.covers.filter(c => !c.ended).map(c => ({ d: c.from, t: `Holiday cover starts`, p: `Area ${db.areas.find(a => a.id === c.area)?.n ?? ''} · ends ${c.to}`, r: 'teams' as Route, id: null as string | null })),
+    ...db.areas.filter(a => a.status === 'Planned' && a.opens).map(a => ({ d: a.opens, t: `Area ${a.n} opens`, p: `${a.waitlist.length} on the waiting list`, r: 'areas' as Route, id: a.id as string | null })),
     ...db.agreements.flatMap(g => g.versions.filter(v => v.status === 'Draft' || (v.status === 'Live' && daysFrom(v.effective) >= 0)).map(v => ({ d: v.effective, t: `${g.name} v${v.v}`, p: v.status === 'Draft' ? 'Draft · effective date' : 'Comes into effect', r: 'agreements' as Route, id: g.id as string | null }))),
     ...(db.tax.vatOn ? [] : [{ d: db.tax.vatFrom, t: 'VAT start date (if switched on)', p: `${db.tax.vatRate}% on LSP fees`, r: 'tax' as Route, id: null as string | null }]),
     { d: db.tax.certBy, t: 'Yearly tax certificates due', p: 'Overseas landlords', r: 'tax' as Route, id: null as string | null },

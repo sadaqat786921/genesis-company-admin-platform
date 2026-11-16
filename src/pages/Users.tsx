@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { UserPlus, Unlock, KeyRound, UserX, UserCheck, MailPlus, Users as UsersIc, ShieldCheck } from 'lucide-react';
-import { useStore } from '../store';
+import { useStore, personName, staffIdOf } from '../store';
+import { areaLabel } from './Areas';
 import { nowStamp, ME_NAME } from '../data';
 import { Card, Chip, Btn, Field, Text, Select, Modal, Empty, Tabs, Facts, Note, Drawer, MiniSearch, Avatar, InfoTip } from '../ui';
 import { Head } from '../Shell';
-import { useDraft, SaveBar, ReasonModal, MultiPick } from '../admin';
+import { useDraft, SaveBar, ReasonModal } from '../admin';
 import { roleTone, statusTone } from './lib';
 import type { User, Role } from '../seed';
 
@@ -48,19 +49,24 @@ export function Users() {
 function Invite({ onClose }: { onClose: () => void }) {
   const s = useStore(); const { db } = s;
   const staffRoles = db.roles.filter(r => r.kind === 'staff').map(r => r.name);
-  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [role, setRole] = useState('Office Admin'); const [areas, setAreas] = useState<string[]>([]);
+  const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [role, setRole] = useState('Office Admin'); const [area, setArea] = useState('');
   const dup = db.users.some(u => u.email.toLowerCase() === email.trim().toLowerCase());
-  const ok = name.trim().includes(' ') && /^\S+@\S+\.\S+$/.test(email) && !dup && (role !== 'Office Admin' || areas.length);
-  const names = db.areas.map(a => a.name);
+  const base = STAFF_ROLES.includes(role as Role) ? role : 'Office Admin';
+  const ar = db.areas.find(a => a.id === area);
+  const supTaken = base === 'Supervisor' && ar?.supervisor;
+  const ok = name.trim().includes(' ') && /^\S+@\S+\.\S+$/.test(email) && !dup && (base === 'Company Admin' || area) && !supTaken;
   return <Modal title="Invite a staff member" sub="They get an email from Outlook to set a password and their security code." onClose={onClose} footer={<><Btn kind="outline" onClick={onClose}>Cancel</Btn><Btn icon={<MailPlus size={16} />} disabled={!ok} onClick={() => {
-    const ids = areas.map(n => db.areas.find(a => a.name === n)!.id);
-    const u: User = { id: 'U' + Date.now(), name: name.trim(), email: email.trim().toLowerCase(), phone: '', role: (STAFF_ROLES.includes(role as Role) ? role : 'Office Admin') as Role, sub: STAFF_ROLES.includes(role as Role) ? undefined : role, areas: role === 'Office Admin' ? ids : db.areas.map(a => a.id), status: 'Invited', last: '—', twoStep: false, created: nowStamp(), logins: [] };
-    s.commit('users', [u, ...db.users], { page: 'Users', item: u.name, what: 'Invited a staff member', after: `${role}${areas.length ? ' · ' + areas.join(', ') : ''}` }, `Invite sent to ${u.email}`); onClose();
+    const u: User = { id: 'U' + Date.now(), name: name.trim(), email: email.trim().toLowerCase(), phone: '', role: base as Role, sub: STAFF_ROLES.includes(role as Role) ? undefined : role, areas: base === 'Company Admin' ? db.areas.map(a => a.id) : [area], status: 'Invited', last: '—', twoStep: false, created: nowStamp(), logins: [] };
+    const areas = db.areas.map(a => a.id !== area ? a : base === 'Supervisor' ? { ...a, supervisor: u.id } : { ...a, oas: [...a.oas, u.id] });
+    s.commitMany({ users: [u, ...db.users], areas }, [{ page: 'Users', item: u.name, what: base === 'Supervisor' ? 'Created a Supervisor' : 'Invited a staff member', after: `${role}${ar ? ' · ' + areaLabel(ar) : ' · every area'}` }], `Invite sent to ${u.email} from Outlook`); onClose();
   }}>Send invite</Btn></>}>
     <div className="grid g2"><Field label="Full name"><Text value={name} onChange={setName} /></Field><Field label="Work email"><Text value={email} onChange={setEmail} placeholder="name@lsp.co.uk" /></Field></div>
     {dup && <Note tone="err">Someone already uses this email.</Note>}
     <Field label="Role"><Select value={role} onChange={setRole} options={staffRoles.map(r => ({ value: r, label: r }))} /></Field>
-    {role === 'Office Admin' ? <Field label="Areas they look after"><MultiPick label="Areas" options={names} value={areas} onChange={setAreas} /></Field> : <Note>{role} sees every area.</Note>}
+    {base === 'Company Admin' ? <Note>A Company Admin sees every area.</Note> : <>
+      <Field label={base === 'Supervisor' ? 'Their area (they see only this area)' : 'Area (they join this Supervisor’s team)'}><Select value={area} onChange={setArea} options={[{ value: '', label: 'Choose an area' }, ...[...db.areas].sort((a, b) => a.n - b.n).map(a => ({ value: a.id, label: `${areaLabel(a)}${a.supervisor ? ' · ' + personName(db, a.supervisor) : ' · no Supervisor yet'}` }))]} /></Field>
+      {supTaken && <Note tone="err">{areaLabel(ar!)} already has a Supervisor ({personName(db, ar!.supervisor)}). Each area has one. Use holiday cover for absences, or change the Supervisor on the area page.</Note>}
+    </>}
   </Modal>;
 }
 
@@ -68,21 +74,28 @@ function UserDrawer({ u, onClose }: { u: User; onClose: () => void }) {
   const s = useStore(); const { db } = s;
   const [act, setAct] = useState<'' | 'disable' | 'enable' | 'unlock' | 'reset' | 'resend'>('');
   const staff = isStaff(u) || !!u.sub && !['Admin', 'Property manager', 'Accounts', 'Rent sharer'].includes(u.sub);
-  const names = db.areas.map(a => a.name);
-  const x = useDraft({ role: u.sub && staff ? u.sub : u.role as string, areas: u.areas.map(id => db.areas.find(a => a.id === id)?.name ?? id) });
+    const sid = staffIdOf(u); const curArea = db.areas.find(a => a.supervisor === sid || a.oas.includes(sid))?.id ?? '';
+  const x = useDraft({ role: u.sub && staff ? u.sub : u.role as string, area: curArea });
+  const base = STAFF_ROLES.includes(x.d.role as Role) ? x.d.role : 'Office Admin';
+  const newArea = db.areas.find(a => a.id === x.d.area);
+  const supTaken = base === 'Supervisor' && newArea && newArea.supervisor && newArea.supervisor !== sid;
   const me = u.name === ME_NAME;
   const set = (patch: Partial<User>, what: string, before: string, after: string, msg: string, reason?: string) => { s.commit('users', db.users.map(y => y.id === u.id ? { ...y, ...patch } : y), { page: 'Users', item: u.name, what, before, after, reason }, msg); setAct(''); };
   const staffRoles = db.roles.filter(r => r.kind === 'staff').map(r => r.name);
   return <Drawer title={u.name} sub={`${u.role}${u.sub ? ' · ' + u.sub : ''}${u.org ? ' · ' + u.org : ''}`} icon={<Avatar name={u.name} size="md" />} onClose={onClose}
-    footer={staff && !me ? <SaveBar dirty={x.dirty} onUndo={x.undo} important="Role and area changes change what this person can see and do." blocked={x.d.role === 'Office Admin' && !x.d.areas.length ? 'An Office Admin needs at least one area.' : ''}
-      onSave={reason => { const custom = !STAFF_ROLES.includes(x.d.role as Role); const ids = x.d.role === 'Office Admin' || custom ? x.d.areas.map(n => db.areas.find(a => a.name === n)!.id) : db.areas.map(a => a.id); set({ role: (custom ? 'Office Admin' : x.d.role) as Role, sub: custom ? x.d.role : undefined, areas: ids }, 'Changed role or areas', `${u.sub ?? u.role} · ${u.areas.length} areas`, `${x.d.role} · ${x.d.areas.join(', ') || 'all areas'}`, 'Saved', reason); }} /> : undefined}>
+    footer={staff && !me ? <SaveBar dirty={x.dirty} onUndo={x.undo} important="Role and area changes change which homes this person can see and do." blocked={base !== 'Company Admin' && !x.d.area ? 'Choose their area.' : supTaken ? `${areaLabel(newArea!)} already has a Supervisor.` : ''}
+      onSave={reason => { const custom = !STAFF_ROLES.includes(x.d.role as Role); const ids = base === 'Company Admin' ? db.areas.map(a => a.id) : [x.d.area];
+        const areas = db.areas.map(a => { const clean = { ...a, supervisor: a.supervisor === sid ? '' : a.supervisor, oas: a.oas.filter(o => o !== sid) }; return a.id !== x.d.area || base === 'Company Admin' ? clean : base === 'Supervisor' ? { ...clean, supervisor: sid } : { ...clean, oas: [...clean.oas, sid] }; });
+        s.commitMany({ users: db.users.map(y => y.id === u.id ? { ...y, role: (custom ? 'Office Admin' : x.d.role) as Role, sub: custom ? x.d.role : undefined, areas: ids } : y), areas }, [{ page: 'Users', item: u.name, what: 'Changed role or area', before: `${u.sub ?? u.role} · ${curArea ? areaLabel(db.areas.find(a => a.id === curArea)!) : 'no area'}`, after: `${x.d.role} · ${newArea ? areaLabel(newArea) : 'every area'}`, reason }]); }} /> : undefined}>
     <div className="flex wrap"><Chip tone={statusTone(u.status)}>{u.status}</Chip>{u.twoStep ? <Chip tone="ok">Security code on</Chip> : <Chip>Security code not set up</Chip>}</div>
     {u.status === 'Locked' && <div className="alertbar a-err"><b className="grow">Locked after 5 wrong security codes.</b><Btn sm icon={<Unlock size={14} />} onClick={() => setAct('unlock')}>Unlock</Btn></div>}
     {u.status === 'Invited' && <div className="alertbar a-info"><b className="grow">Hasn't set a password yet.</b><Btn sm kind="outline" icon={<MailPlus size={14} />} onClick={() => setAct('resend')}>Resend invite</Btn></div>}
     <Facts items={[['Email', u.email], ['Phone', u.phone || '—'], ['Added', u.created], ['Last signed in', u.last]]} />
-    {staff && !me ? <Card title="Role and areas" className="flat">
+    {staff && !me ? <Card title="Role and area" className="flat">
       <Field label="Role"><Select value={x.d.role} onChange={v => x.patch({ role: v })} options={staffRoles.map(r => ({ value: r, label: r }))} /></Field>
-      {x.d.role === 'Office Admin' || !STAFF_ROLES.includes(x.d.role as Role) ? <Field label="Areas they look after"><MultiPick label="Areas" options={names} value={x.d.areas} onChange={v => x.patch({ areas: v })} /></Field> : <Note>{x.d.role} sees every area.</Note>}
+      {base === 'Company Admin' ? <Note>A Company Admin sees every area.</Note> : <Field label={base === 'Supervisor' ? 'Their area (they see only this area)' : 'Area (they work in this Supervisor’s team)'}><Select value={x.d.area} onChange={v => x.patch({ area: v })} options={[{ value: '', label: 'Choose an area' }, ...[...db.areas].sort((a, b) => a.n - b.n).map(a => ({ value: a.id, label: `${areaLabel(a)}${a.supervisor && a.supervisor !== sid ? ' · ' + personName(db, a.supervisor) : ''}` }))]} /></Field>}
+      {supTaken && <Note tone="err">{areaLabel(newArea!)} already has a Supervisor ({personName(db, newArea!.supervisor)}). Change it on the area page first.</Note>}
+      {curArea && x.d.area !== curArea && base !== 'Company Admin' && <Note tone="warn">They leave {areaLabel(db.areas.find(a => a.id === curArea)!)}. {base === 'Supervisor' ? 'That area needs a new Supervisor.' : 'Move their landlords in Teams & cover.'}</Note>}
       <Btn sm kind="ghost" icon={<ShieldCheck size={14} />} onClick={() => s.go('roles')}>See what this role can do</Btn>
     </Card> : <Note>{me ? "This is you. Another Company Admin can change your role." : `${u.role} logins are created by the flows in the staff portals. You can unlock, reset, disable or enable this login.`}</Note>}
     <div className="col" style={{ gap: 8 }}>

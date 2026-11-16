@@ -17,10 +17,14 @@ export interface Alert { t: string; d: string; r: Route; id: string | null; tone
 export function attention(db: Db): Alert[] {
   const a: Alert[] = [];
   db.users.filter(u => u.status === 'Locked').forEach(u => a.push({ t: `${u.name} is locked out`, d: `${u.role}${u.org ? ' · ' + u.org : ''} · too many wrong codes`, r: 'users', id: u.id, tone: 'err' }));
-  db.areas.filter(x => x.status !== 'Off' && !x.oa).forEach(x => a.push({ t: `${x.name} has no Office Admin`, d: 'Choose who looks after this area', r: 'areas', id: x.id, tone: 'err' }));
+  db.areas.filter(x => x.status === 'Live' && !x.supervisor).forEach(x => a.push({ t: `Area ${x.n} has no Supervisor`, d: 'Choose who is responsible for it', r: 'areas', id: x.id, tone: 'err' }));
+  db.areas.filter(x => x.status === 'Live' && !x.oas.length).forEach(x => a.push({ t: `Area ${x.n} has no Office Admins`, d: 'Add the team on the area page', r: 'areas', id: x.id, tone: 'err' }));
+  if (db.unmatched.length) a.push({ t: `${db.unmatched.length} home${db.unmatched.length === 1 ? '' : 's'} need an area`, d: 'Their postcode matched no area. Choose one.', r: 'areas', id: null, tone: 'warn' });
+  db.shares.filter(r => r.status === 'Waiting').forEach(r => a.push({ t: `${r.by} asks to share ${r.district}`, d: `Until ${r.until} · needs your approval`, r: 'areas', id: null, tone: 'warn' }));
+  db.covers.filter(c => !c.ended && daysFrom(c.to) >= 0).forEach(c => { const ar = db.areas.find(z => z.id === c.area); a.push({ t: `Holiday cover for Area ${ar?.n}: ${c.from} to ${c.to}`, d: daysFrom(c.from) <= 0 ? 'Active now' : 'Booked', r: 'teams', id: null, tone: 'info' }); });
   db.agreements.forEach(g => { const d = draftOf(g); if (d) a.push({ t: `${g.name}: version ${d.v} is a draft`, d: `Effective ${d.effective} once published`, r: 'agreements', id: g.id, tone: 'info' }); });
   db.agreements.forEach(g => { const w = waitingOf(g); if (w.length) a.push({ t: `${w.length} still to accept the ${g.name.toLowerCase()}`, d: `Version ${liveOf(g).v} · ${w.slice(0, 2).join(', ')}${w.length > 2 ? '…' : ''}`, r: 'agreements', id: g.id, tone: 'warn' }); });
-  db.areas.filter(x => x.status === 'Planned' && x.opens && daysFrom(x.opens) <= 90).forEach(x => a.push({ t: `${x.name} opens on ${x.opens}`, d: `${x.waitlist.length} on the waiting list`, r: 'areas', id: x.id, tone: 'info' }));
+  db.areas.filter(x => x.status === 'Planned' && x.opens && daysFrom(x.opens) <= 180).forEach(x => a.push({ t: `Area ${x.n} opens on ${x.opens}`, d: `${x.waitlist.length} on the waiting list`, r: 'areas', id: x.id, tone: 'info' }));
   db.reminders.filter(r => !r.on).forEach(r => a.push({ t: `Reminder paused: ${r.name}`, d: timingOf(r), r: 'reminders', id: r.id, tone: 'warn' }));
   db.templates.filter(t => !t.on).forEach(t => a.push({ t: `Message off: ${t.name}`, d: `${t.channel} to ${t.to.toLowerCase()}`, r: 'templates', id: t.id, tone: 'warn' }));
   db.users.filter(u => u.status === 'Invited').forEach(u => a.push({ t: `${u.name} hasn't set a password yet`, d: `${u.role} · invited ${u.created.split(',')[0]}`, r: 'users', id: u.id, tone: 'neutral' }));

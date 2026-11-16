@@ -44,8 +44,10 @@ export interface Staff { id: string; name: string; role: 'Company Admin' | 'Supe
 export const STAFF: Staff[] = [
   { id: 'ma', name: 'Michael Grant', role: 'Company Admin', photo: 'images/av0.jpg', initials: 'MG', color: '#001649', email: 'm.grant@lsp.co.uk', phone: '020 7946 0002' },
   { id: 'sk', name: 'Sarah Khan', role: 'Supervisor', photo: 'images/sarah.jpg', initials: 'SK', color: '#153D91', email: 's.khan@lsp.co.uk', phone: '020 7946 0001' },
+  { id: 'mb', name: 'Marcus Bell', role: 'Supervisor', initials: 'MB', color: '#3C7300', email: 'm.bell@lsp.co.uk', phone: '020 7946 0003' },
   { id: 'et', name: 'Emma Thompson', role: 'Office Admin', photo: 'images/av3.jpg', initials: 'ET', color: '#099FFD', email: 'e.thompson@lsp.co.uk', phone: '020 7946 0011' },
   { id: 'jc', name: 'James Carter', role: 'Office Admin', photo: 'images/av1.jpg', initials: 'JC', color: '#5BAF00', email: 'j.carter@lsp.co.uk', phone: '020 7946 0012' },
   { id: 'ps', name: 'Priya Shah', role: 'Office Admin', initials: 'PS', color: '#153D91', email: 'p.shah@lsp.co.uk', phone: '020 7946 0013' },
   { id: 'lm', name: 'Liam Murphy', role: 'Office Admin', photo: 'images/av5.jpg', initials: 'LM', color: '#0B6FB8', email: 'l.murphy@lsp.co.uk', phone: '020 7946 0014' },
+  { id: 'nr', name: 'Nadia Rossi', role: 'Office Admin', initials: 'NR', color: '#0B6FB8', email: 'n.rossi@lsp.co.uk', phone: '020 7946 0015' },
 ];

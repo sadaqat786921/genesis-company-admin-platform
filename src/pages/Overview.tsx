@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MapPinned, Users as UsersIc, BellRing, MessageSquareText, ListChecks, ScrollText, BadgePercent, Wrench, ArrowRight, RotateCcw, History, ShieldCheck, AlertTriangle, Info } from 'lucide-react';
-import { useStore, staffName } from '../store';
+import { useStore, personName, homesOf } from '../store';
+import { AREA_TONE } from './Areas';
 import { Card, Chip, Bar, Btn, Empty, Avatar, Modal } from '../ui';
 import { Head } from '../Shell';
 import { attention, liveOf, waitingOf, statusTone } from './lib';
@@ -12,7 +13,7 @@ export function Overview() {
   const roles = ['Company Admin', 'Supervisor', 'Office Admin', 'Landlord', 'Tenant', 'Applicant', 'Letting agent', 'Contractor'] as const;
   const paused = db.reminders.filter(r => !r.on).length; const locked = db.users.filter(u => u.status === 'Locked').length;
   const tiles = [
-    { r: 'areas' as const, ic: MapPinned, tone: 'brand', l: 'Live areas', n: db.areas.filter(a => a.status === 'Live').length, sub: `${db.areas.filter(a => a.status === 'Planned').length} opening`, st: 'info' },
+    { r: 'areas' as const, ic: MapPinned, tone: 'brand', l: 'Live areas', n: db.areas.filter(a => a.status === 'Live').length, sub: db.unmatched.length ? `${db.unmatched.length} homes need one` : `of ${db.areas.length}`, st: db.unmatched.length ? 'warn' : '' },
     { r: 'users' as const, ic: UsersIc, tone: 'info', l: 'Active users', n: db.users.filter(u => u.status === 'Active').length, sub: locked ? `${locked} locked` : `of ${db.users.length}`, st: locked ? 'err' : '' },
     { r: 'plans' as const, ic: BadgePercent, tone: 'brand', l: 'Plans', n: db.plans.length, sub: `${db.plans.filter(p => p.web).length} on website`, st: '' },
     { r: 'services' as const, ic: Wrench, tone: 'ok', l: 'Services', n: db.services.filter(x => x.on).length, sub: `of ${db.services.length}`, st: '' },
@@ -47,11 +48,11 @@ export function Overview() {
           <div className="flex between"><b className="small" style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{g.name} · v{live.v}</b><span className="caption">{done} of {n}{wait ? ` · ${wait} waiting` : ''}</span></div>
           <Bar value={n ? done / n * 100 : 100} tone={wait ? 'warn' : 'ok'} /></button>; })}</div>
       </Card>
-      <Card title="Areas" action={<Btn sm kind="ghost" onClick={() => s.go('areas')}>Open</Btn>}>
-        <div>{db.areas.map(a => <button key={a.id} className="rowlink" onClick={() => s.go('areas', a.id)}>
-          <span className="tile t-brand" style={{ width: 32, height: 32 }}><MapPinned size={15} /></span>
-          <div className="stack grow"><b>{a.name}</b><span className="caption">{a.postcodes.join(', ')} · {a.oa ? staffName(a.oa) : 'No Office Admin'}</span></div>
-          <span className="caption" style={{ width: 70 }}>{a.homes} homes</span><Chip tone={statusTone(a.status)}>{a.status === 'Planned' ? `Opens ${a.opens}` : a.status}</Chip></button>)}</div>
+      <Card title="Supervisor areas" action={<Btn sm kind="ghost" onClick={() => s.go('areas')}>Open</Btn>}>
+        <div>{[...db.areas].sort((a, b) => a.n - b.n).map(a => <button key={a.id} className="rowlink" onClick={() => s.go('areas', a.id)}>
+          <span className={`tile t-${AREA_TONE[a.n] ?? 'brand'}`} style={{ width: 32, height: 32, fontWeight: 800 }}>{a.n}</span>
+          <div className="stack grow"><b>{a.name}</b><span className="caption">{a.supervisor ? `Supervisor ${personName(db, a.supervisor)}` : 'No Supervisor yet'} · {a.oas.length} Office Admin{a.oas.length === 1 ? '' : 's'} · {a.postcodes.length} districts</span></div>
+          <span className="caption" style={{ width: 70 }}>{homesOf(db, a.id)} homes</span><Chip tone={statusTone(a.status)}>{a.status === 'Planned' ? `Opens ${a.opens}` : a.status}</Chip></button>)}</div>
       </Card>
     </div>
     <div className="grid g2">
