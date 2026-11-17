@@ -39,6 +39,7 @@ export interface User {
   id: string; name: string; email: string; phone: string; role: Role; /** Letting agent team role, or a custom staff role. */ sub?: string;
   org?: string; areas: string[]; status: UserStatus; last: string; twoStep: boolean; created: string; logins: string[];
   /** Sub Admins only: which sidebar pages they can open, and whether they can change them. */ access?: Record<string, Access3>;
+  /** Sub Admins: the Admin set the first password; they must change it at first sign-in. */ pwChange?: boolean;
 }
 /** A Sub Admin's access to one sidebar page. */
 export type Access3 = 'off' | 'view' | 'edit';
