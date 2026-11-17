@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Download, Users, Search, ArrowRightLeft, Share2, Inbox, Check, X, MapPin, Lock } from 'lucide-react';
+import { Plus, Trash2, Download, Users, Search, ArrowRightLeft, Share2, Inbox, Check, X, Lock } from 'lucide-react';
 import { useStore, personName, staffOptions, districtOf, areasFor, homesOf, landlordsOf, type Db } from '../store';
 import { nowStamp, fromInput, toInput, ME_NAME } from '../data';
 import { Card, Chip, Btn, Field, Text, Select, Modal, Empty, Tabs, Facts, Avatar, MoreMenu, Note, InfoTip } from '../ui';
@@ -30,18 +30,13 @@ function AreaList() {
   const [tab, setTab] = useState<'areas' | 'needs' | 'shared'>('areas'); const [add, setAdd] = useState(false);
   const waiting = db.shares.filter(r => r.status === 'Waiting').length;
   return <>
-    <Head r="areas" action={tab === 'areas' ? <Btn icon={<Plus size={16} />} onClick={() => setAdd(true)}>Add an area</Btn> : undefined} />
-    <Tabs value={tab} onChange={setTab} items={[{ id: 'areas', label: 'Supervisor areas', count: db.areas.length }, { id: 'needs', label: 'Needs an area', count: db.unmatched.length }, { id: 'shared', label: 'Shared districts', count: waiting || undefined }]} />
+    <Head r="areas" action={<div className="flex" style={{ gap: 12 }}>
+      <Tabs value={tab} onChange={setTab} items={[{ id: 'areas', label: 'Areas', count: db.areas.length }, { id: 'needs', label: 'Needs an area', count: db.unmatched.length || undefined }, { id: 'shared', label: 'Shared districts', count: waiting || undefined }]} />
+      {tab === 'areas' && <Btn icon={<Plus size={16} />} onClick={() => setAdd(true)}>Add an area</Btn>}
+    </div>} />
     {tab === 'areas' && <>
-      <div className="grid g4">{[...db.areas].sort((a, b) => a.n - b.n).map(a => <AreaCard key={a.id} a={a} db={db} onOpen={() => s.go('areas', a.id)} />)}</div>
-      <div className="grid g2">
-        <PostcodeCheck />
-        <Card title={<span className="clean-h">How it works<InfoTip>From the proposal agreed on 28 October: one Supervisor portal, many Supervisors. Each one sees only the homes in their own area, with their own Office Admins.</InfoTip></span>}>
-          <div className="col" style={{ gap: 8 }}>
-            {['Each postcode district belongs to one area.', 'New homes and enquiries find their Supervisor by postcode. Nobody sorts them by hand.', 'No match, or more than one: the home waits in “Needs an area” for you.', 'A Supervisor never sees another area’s homes, not even through a link. Only you can widen access.'].map(t => <div key={t} className="flex" style={{ alignItems: 'flex-start' }}><Check size={15} color="var(--ok)" style={{ marginTop: 2, flex: 'none' }} /><span className="small" style={{ color: 'var(--text-secondary)' }}>{t}</span></div>)}
-          </div>
-        </Card>
-      </div>
+      <PostcodeCheck />
+      <div className="grid g2">{[...db.areas].sort((a, b) => a.n - b.n).map(a => <AreaCard key={a.id} a={a} db={db} onOpen={() => s.go('areas', a.id)} />)}</div>
     </>}
     {tab === 'needs' && <NeedsArea />}
     {tab === 'shared' && <SharedDistricts />}
@@ -51,26 +46,30 @@ function AreaList() {
 
 function AreaCard({ a, db, onOpen }: { a: Area; db: Db; onOpen: () => void }) {
   const tone = AREA_TONE[a.n] ?? 'brand';
-  return <button className="card areacard" onClick={onOpen} style={{ textAlign: 'left', font: 'inherit', cursor: 'pointer', padding: 0, gap: 0, overflow: 'hidden' }}>
-    <div className={`ac-h t-${tone}`}><span className="ac-n">{a.n}</span><div className="stack grow"><b>{a.name}</b><span>{a.status === 'Planned' ? `Opens ${a.opens}` : a.status === 'Live' ? 'Live' : 'Off'}</span></div></div>
-    <div className="col" style={{ gap: 12, padding: 16 }}>
-      <div className="flex" style={{ gap: 10 }}>{a.supervisor ? <Avatar id={a.supervisor} name={personName(db, a.supervisor)} /> : <span className="tile t-neutral" style={{ width: 32, height: 32 }}><Users size={15} /></span>}
-        <div className="stack grow"><b className="small" style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{a.supervisor ? personName(db, a.supervisor) : 'No Supervisor yet'}</b><span className="caption">Supervisor</span></div></div>
-      <div className="flex wrap" style={{ gap: 4 }}>{a.postcodes.slice(0, 6).map(p => <span key={p} className="pcd">{p}</span>)}{a.postcodes.length > 6 && <span className="pcd more">+{a.postcodes.length - 6}</span>}</div>
-      <div className="ac-f"><span><b>{a.oas.length}</b> Office Admins</span><span><b>{homesOf(db, a.id)}</b> homes</span><span><b>{a.postcodes.length}</b> districts</span></div>
+  return <button className="card areacard" onClick={onOpen}>
+    <div className="flex" style={{ gap: 10 }}>
+      <span className={`tile t-${tone} ac-n`}>{a.n}</span>
+      <div className="stack grow" style={{ minWidth: 0 }}><b className="ac-name">{a.name}</b><span className="caption">Area {a.n} · {a.postcodes.length} districts</span></div>
+      <Chip tone={statusTone(a.status)}>{a.status === 'Planned' ? 'Opening' : a.status}</Chip>
     </div>
+    <div className="ac-sup">{a.supervisor ? <Avatar id={a.supervisor} name={personName(db, a.supervisor)} /> : <span className="tile t-neutral" style={{ width: 32, height: 32 }}><Users size={15} /></span>}
+      <div className="stack grow"><b className="small" style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{a.supervisor ? personName(db, a.supervisor) : 'No Supervisor yet'}</b><span className="caption">Supervisor</span></div></div>
+    <div className="flex wrap" style={{ gap: 4, minHeight: 22 }}>{a.postcodes.slice(0, 10).map(p => <span key={p} className="pcd">{p}</span>)}{a.postcodes.length > 10 && <span className="pcd more">+{a.postcodes.length - 10}</span>}{!a.postcodes.length && <span className="caption">No districts yet</span>}</div>
+    <div className="ac-f"><span><b>{a.oas.length}</b> Office Admins</span><span><b>{homesOf(db, a.id)}</b> homes</span>{a.status === 'Planned' && <span>Opens <b>{a.opens}</b></span>}</div>
   </button>;
 }
 
 /** Type a full postcode and see which area it goes to, using exact matching. */
 function PostcodeCheck() {
-  const { db } = useStore(); const [pc, setPc] = useState('N2 9RF');
+  const { db } = useStore(); const [pc, setPc] = useState('');
   const d = pc.trim() ? districtOf(pc) : ''; const hits = pc.trim() ? areasFor(db, pc) : [];
-  return <Card title={<span className="clean-h"><Search size={16} />Check a postcode</span>} sub="Exact matching: N20 is not N2, and E1W is not E1">
-    <Field label="Full postcode"><Text value={pc} onChange={v => setPc(v.toUpperCase())} placeholder="e.g. N2 9RF" /></Field>
-    {d && (hits.length === 1 ? <div className="alertbar a-ok"><MapPin size={16} /><b className="grow">{pc} → {d} → {areaLabel(hits[0])}<span className="caption" style={{ marginLeft: 8, fontWeight: 500 }}>Supervisor {hits[0].supervisor ? personName(db, hits[0].supervisor) : 'not chosen yet'}</span></b></div>
-      : <div className="alertbar a-warn"><Inbox size={16} /><b className="grow">{pc} → {d} → {hits.length ? `${hits.length} areas match` : 'no area'}<span className="caption" style={{ marginLeft: 8, fontWeight: 500 }}>It goes to “Needs an area” for you to place</span></b></div>)}
-  </Card>;
+  return <div className="pccheck">
+    <span className="tile t-brand" style={{ width: 36, height: 36 }}><Search size={16} /></span>
+    <div className="stack" style={{ width: 200 }}><b className="small" style={{ color: 'var(--text-primary)', fontWeight: 700 }}>Check a postcode<InfoTip>Each postcode district belongs to one area. New homes and enquiries find their Supervisor by postcode. Exact matching: N20 is not N2, E1W is not E1. No match, or more than one, goes to “Needs an area”.</InfoTip></b><span className="caption">Which area does it go to?</span></div>
+    <input className="input" style={{ maxWidth: 220 }} aria-label="Full postcode" value={pc} onChange={e => setPc(e.target.value.toUpperCase())} placeholder="e.g. N2 9RF" />
+    <div className="grow">{d && (hits.length === 1 ? <span className="flex" style={{ gap: 8 }}><Chip tone="ok">{d}</Chip><b className="small" style={{ color: 'var(--text-primary)' }}>{areaLabel(hits[0])}</b><span className="caption">· {hits[0].supervisor ? personName(db, hits[0].supervisor) : 'no Supervisor yet'}</span></span>
+      : <span className="flex" style={{ gap: 8 }}><Chip tone="warn">{d}</Chip><b className="small" style={{ color: 'var(--text-primary)' }}>{hits.length ? `${hits.length} areas match` : 'No area'}</b><span className="caption">· goes to “Needs an area”</span></span>)}</div>
+  </div>;
 }
 
 function NeedsArea() {
@@ -162,11 +161,10 @@ function AreaPage({ id }: { id: string }) {
   const labels: Partial<Record<keyof Area, string>> = { name: 'Name', base: 'Base', postcodes: 'Districts', status: 'Status', opens: 'Opening date', message: 'Website message', supervisor: 'Supervisor', oas: 'Office Admins' };
   const shown = (v: Area) => ({ ...v, supervisor: v.supervisor ? personName(db, v.supervisor) : '', oas: v.oas.map(o => personName(db, o)) });
   const sharesHere = db.shares.filter(r => (r.owner === id || r.to === id) && r.status === 'Approved');
-  const tone = AREA_TONE[d.n] ?? 'brand';
   return <>
-    <Head r="areas" extra={areaLabel(a0)} title={<span className="flex" style={{ gap: 12 }}><span className={`tile t-${tone}`} style={{ fontWeight: 800 }}>{a0.n}</span>{a0.name}</span>} back
+    <Head r="areas" extra={`Area ${a0.n}`} title={a0.name} back
       action={<MoreMenu label="···" items={[{ label: 'Export the waiting list', icon: <Download size={16} />, onClick: () => { downloadCsv(`waiting-list-area-${a0.n}.csv`, [['Name', 'Email', 'Postcode', 'Type', 'Joined'], ...a0.waitlist.map(w => [w.name, w.email, w.postcode, w.kind, w.at])]); s.toast('Waiting list downloaded'); } }, { label: 'Delete this area', icon: <Trash2 size={16} />, danger: true, onClick: () => setDel(true) }]} />} />
-    <Card><Facts items={[['Status', <Chip key="s" tone={statusTone(a0.status)}>{a0.status === 'Planned' ? `Opens ${a0.opens}` : a0.status}</Chip>], ['Supervisor', a0.supervisor ? personName(db, a0.supervisor) : 'Not chosen'], ['Office Admins', a0.oas.length], ['Homes', homes], ['Landlords and clients', landlordsOf(db, id)], ['Districts', a0.postcodes.length], ['Base', a0.base || '—']]} /></Card>
+    <Card><Facts items={[['Status', <Chip key="s" tone={statusTone(a0.status)}>{a0.status === 'Planned' ? `Opens ${a0.opens}` : a0.status}</Chip>], ['Supervisor', a0.supervisor ? personName(db, a0.supervisor) : 'Not chosen'], ['Office Admins', a0.oas.length], ['Homes', homes], ['Landlords and clients', landlordsOf(db, id)], ['Districts', a0.postcodes.length]]} /></Card>
     <div className="adm-split">
       <div className="col">
         <Card title={<span className="clean-h">Supervisor and team<InfoTip>One Supervisor is always responsible for the area. Their Office Admins work only in this area, and their requests go to this Supervisor (or the cover during leave).</InfoTip></span>}>

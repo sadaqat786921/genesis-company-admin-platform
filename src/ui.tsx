@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { X, Search, Check, Info, AlertTriangle, PhoneCall, Mail, StickyNote, Globe, Bot, MessageSquare, FileText, Upload, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { X, Search, Check, Info, AlertTriangle, PhoneCall, Mail, StickyNote, Globe, Bot, MessageSquare, FileText, Upload, ArrowDownLeft, ArrowUpRight, MoreHorizontal } from 'lucide-react';
 import { nowStamp, parseDate, fmtDate, MONTHS, type Comm, type DocStatus, type Tone } from './data';
 import { ME_NAME } from './data';
 import { staff, useStore } from './store';
@@ -272,7 +272,7 @@ export function MoreMenu({ items, label = 'More' }: { items: ({ label: string; i
   const [open, setOpen] = useState(false); const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (!open) return; const h = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, [open]);
   const list = items.filter(Boolean) as { label: string; icon?: ReactNode; onClick: () => void; danger?: boolean }[];
-  return <div className="more" ref={ref}>{label === '···' ? <button type="button" className="btn line sm dots" aria-label="More actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}>···</button> : <button type="button" className="btn line" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}>{label}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg></button>}
+  return <div className="more" ref={ref}>{label === '···' ? <button type="button" className="ibtn" aria-label="More actions" title="More actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}><MoreHorizontal size={20} strokeWidth={1.8} /></button> : <button type="button" className="btn line" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}>{label}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="m6 9 6 6 6-6" /></svg></button>}
     {open && <div className="more-m" role="menu">{list.map(it => <button key={it.label} type="button" role="menuitem" className={it.danger ? 'danger' : ''} onClick={() => { setOpen(false); it.onClick(); }}>{it.icon}{it.label}</button>)}</div>}</div>;
 }
 /** A photo placeholder: a neutral tile with a camera icon and the photo's name. */

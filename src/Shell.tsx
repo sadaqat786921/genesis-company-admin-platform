@@ -94,6 +94,7 @@ export function PageHeader({ title, action, crumbs, back }: { title: ReactNode; 
         {crumbs && <div className="crumbs">{crumbs.map((c, i) => <span key={i} className="flex" style={{ gap: 6 }}>{i > 0 && <ChevronRight size={12} />}{c.onClick ? <button onClick={c.onClick}>{c.label}</button> : <span>{c.label}</span>}</span>)}</div>}
         <h1 className="h1">{title}</h1>
       </div>
+      {s.route === 'overview' && <>
       <div className="searchwrap">
         <label className="search"><Search size={18} strokeWidth={1.8} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search settings, users, templates" aria-label="Search everything" /><span className="kbd">⌘K</span></label>
         {results.length > 0 && <div className="pop" style={{ left: 0, right: 'auto', width: 320 }}>{results.map((r, i) => <button key={i} className="item click" style={{ padding: '8px 10px' }} onClick={() => { setQ(''); r.go(); }}><div className="stack"><b style={{ fontSize: 12.5 }}>{r.label}</b><span className="caption">{r.sub}</span></div></button>)}</div>}
@@ -111,6 +112,7 @@ export function PageHeader({ title, action, crumbs, back }: { title: ReactNode; 
           {cal.map((c, i) => { const [dd, mm] = c.d.split(' '); return <button key={i} className="item click" style={{ padding: '8px 10px' }} onClick={() => { setPop(''); s.go(c.r, c.id); }}><span className="datetile t-info" style={{ width: 40, height: 42 }}><b style={{ fontSize: 14 }}>{dd}</b><span>{(mm || '').toUpperCase()}</span></span><div className="stack"><b style={{ fontSize: 12.5 }}>{c.t}</b><span className="caption">{c.p}</span></div></button>; })}
           {!cal.length && <div className="empty">Nothing coming up.</div>}</div>}
       </div>
+      </>}
       {action}
     </header>
   );
@@ -124,7 +126,7 @@ export const crumbsFor = (r: Route, go: (r: Route) => void, extra?: string) => {
 /** Page header with the usual breadcrumbs. */
 export function Head({ r, title, extra, action, back }: { r: Route; title?: ReactNode; extra?: string; action?: ReactNode; back?: boolean }) {
   const s = useStore();
-  return <PageHeader crumbs={crumbsFor(r, s.go, extra)} title={title ?? LABEL[r]} action={action} back={back ? () => s.go(r) : undefined} />;
+  return <PageHeader crumbs={r === 'overview' ? undefined : crumbsFor(r, s.go, extra)} title={title ?? LABEL[r]} action={action} back={back ? () => s.go(r) : undefined} />;
 }
 
 /** Sign in (email, password, then a 6-digit code). */
