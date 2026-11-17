@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   LayoutDashboard, Building2, MapPinned, BadgePercent, Wrench, Barcode, Landmark, Users, ShieldCheck, Network, KeyRound, Home, Briefcase, HardHat,
   BellRing, MessageSquareText, ListChecks, Workflow, FolderLock, ScrollText, FileText, History,
-  PanelLeft, LogOut, Search, Bell, CalendarDays, ChevronRight, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldAlert, Check, RotateCcw, MoreVertical,
+  UserCog, PanelLeft, LogOut, Search, Bell, CalendarDays, ChevronRight, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldAlert, Check, RotateCcw, MoreVertical,
 } from 'lucide-react';
 import { useStore, type Route } from './store';
 import { daysFrom, parseDate, LSP_PHONE, ME_NAME, ME_EMAIL } from './data';
@@ -12,7 +12,7 @@ import { attention, draftOf } from './pages/lib';
 export const NAV: { group: string; items: { id: Route; label: string; icon: typeof Home }[] }[] = [
   { group: 'Overview', items: [{ id: 'overview', label: 'Overview', icon: LayoutDashboard }] },
   { group: 'Business', items: [{ id: 'company', label: 'Company details', icon: Building2 }, { id: 'areas', label: 'Areas', icon: MapPinned }, { id: 'plans', label: 'Plans', icon: BadgePercent }, { id: 'services', label: 'Services & prices', icon: Wrench }, { id: 'products', label: 'Products & codes', icon: Barcode }, { id: 'tax', label: 'VAT & tax', icon: Landmark }] },
-  { group: 'People', items: [{ id: 'users', label: 'Users', icon: Users }, { id: 'roles', label: 'Roles & permissions', icon: ShieldCheck }, { id: 'teams', label: 'Teams & cover', icon: Network }] },
+  { group: 'People', items: [{ id: 'users', label: 'Users', icon: Users }, { id: 'subadmins', label: 'Sub Admins', icon: UserCog }, { id: 'roles', label: 'Roles & permissions', icon: ShieldCheck }, { id: 'teams', label: 'Teams & cover', icon: Network }] },
   { group: 'Onboarding', items: [{ id: 'onb-tenant', label: 'Tenant onboarding', icon: KeyRound }, { id: 'onb-landlord', label: 'Landlord onboarding', icon: Home }, { id: 'onb-agent', label: 'Letting agent onboarding', icon: Briefcase }, { id: 'onb-contractor', label: 'Contractor onboarding', icon: HardHat }] },
   { group: 'Messages & work', items: [{ id: 'reminders', label: 'Reminders', icon: BellRing }, { id: 'templates', label: 'Message templates', icon: MessageSquareText }, { id: 'checklists', label: 'Checklists', icon: ListChecks }, { id: 'stages', label: 'Stages & lists', icon: Workflow }] },
   { group: 'Documents & records', items: [{ id: 'access', label: 'Document access', icon: FolderLock }, { id: 'agreements', label: 'Agreements', icon: ScrollText }, { id: 'doctemplates', label: 'Document templates', icon: FileText }, { id: 'audit', label: 'Audit history', icon: History }] },
@@ -37,17 +37,18 @@ export function Sidebar({ onLogout }: { onLogout: () => void }) {
     <aside className="sidebar" style={collapsed ? { width: 76 } : undefined} aria-label="Main menu">
       <div className="sb-logo">{!collapsed && <img src="images/logo.svg" alt="Landlord Service Plans" />}<button onClick={() => setCollapsed(c => !c)} aria-label="Collapse menu"><PanelLeft size={18} strokeWidth={1.8} /></button></div>
       <nav className="sb-nav">
-        {NAV.map((g, gi) => <div key={g.group} className={gi > 0 ? 'sb-group' : undefined}>
+        {NAV.filter(g => g.items.some(it => s.accessOf(it.id) !== 'off')).map((g, gi) => <div key={g.group} className={gi > 0 ? 'sb-group' : undefined}>
           {gi > 0 && !collapsed && <span className="sec-label" style={{ padding: '0 10px 4px', fontSize: 10 }}>{g.group}</span>}
-          {g.items.map(it => { const Ic = it.icon; const n = counts[it.id]; return (
+          {g.items.filter(it => s.accessOf(it.id) !== 'off').map(it => { const Ic = it.icon; const n = s.viewAs ? 0 : counts[it.id]; return (
             <button key={it.id} className={`nav${s.route === it.id ? ' on' : ''}`} onClick={() => s.go(it.id)} title={it.label} aria-current={s.route === it.id ? 'page' : undefined}>
               <Ic size={20} strokeWidth={1.8} />{!collapsed && <span>{it.label}</span>}{!collapsed && !!n && <span className="count">{n}</span>}
             </button>); })}
         </div>)}
       </nav>
-      <div className="sb-user" style={{ position: 'relative' }}><Avatar id="ma" size="md" />{!collapsed && <div className="stack grow"><b style={{ fontSize: 13, color: 'var(--text-primary)' }}>{ME_NAME}</b><span className="caption">Company Admin</span></div>}
+      <div className="sb-user" style={{ position: 'relative' }}>{s.viewAs ? <Avatar name={s.viewAs.name} size="md" /> : <Avatar id="ma" size="md" />}{!collapsed && <div className="stack grow"><b style={{ fontSize: 13, color: 'var(--text-primary)' }}>{s.viewAs?.name ?? ME_NAME}</b><span className="caption">{s.viewAs ? 'Sub Admin' : 'Company Admin'}</span></div>}
         <button onClick={() => setMenu(m => !m)} aria-label="Account menu" title="Account menu"><MoreVertical size={18} strokeWidth={1.8} /></button>
         {menu && <div className="more-m" style={{ bottom: 'calc(100% + 6px)', top: 'auto', left: 0, right: 0 }} onMouseLeave={() => setMenu(false)}>
+          {s.viewAs && <button onClick={() => { setMenu(false); s.setViewAs(null); s.go('subadmins', s.viewAs!.id); }}><UserCog size={16} />Back to my view (Admin)</button>}
           <button onClick={() => { setMenu(false); setReset(true); }}><RotateCcw size={16} />Reset demo data</button>
           <button onClick={() => { setMenu(false); onLogout(); }}><LogOut size={16} />Log out</button>
         </div>}
@@ -65,27 +66,27 @@ export function PageHeader({ title, action, crumbs, back }: { title: ReactNode; 
   const ref = useRef<HTMLDivElement>(null);
   const results = useMemo(() => {
     const t = q.trim().toLowerCase(); if (t.length < 2) return [];
-    const r: { label: string; sub: string; go: () => void }[] = [];
-    NAV.flatMap(g => g.items).filter(i => i.label.toLowerCase().includes(t)).forEach(i => r.push({ label: i.label, sub: 'Page', go: () => s.go(i.id) }));
-    db.users.filter(x => (x.name + ' ' + x.email + ' ' + (x.org ?? '')).toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: `User · ${x.role}`, go: () => s.go('users', x.id) }));
-    db.areas.filter(x => (x.name + ' ' + x.postcodes.join(' ')).toLowerCase().includes(t)).forEach(x => r.push({ label: `Area ${x.n} · ${x.name}`, sub: `${x.postcodes.slice(0, 6).join(', ')}`, go: () => s.go('areas', x.id) }));
-    db.templates.filter(x => (x.name + ' ' + x.subject).toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: `Message template · ${x.channel}`, go: () => s.go('templates', x.id) }));
-    db.reminders.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: 'Reminder', go: () => s.go('reminders', x.id) }));
-    db.checklists.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: 'Checklist', go: () => s.go('checklists', x.id) }));
-    db.agreements.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: 'Agreement', go: () => s.go('agreements', x.id) }));
-    db.docTemplates.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: 'Document template', go: () => s.go('doctemplates', x.id) }));
-    db.products.filter(x => (x.code + ' ' + x.name).toLowerCase().includes(t)).forEach(x => r.push({ label: `${x.code} · ${x.name}`, sub: 'Product or service', go: () => s.go('products', x.code) }));
-    db.services.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ label: x.name, sub: 'Service', go: () => s.go('services', x.id) }));
-    return r.slice(0, 9);
+    const r: { rt: Route; label: string; sub: string; go: () => void }[] = [];
+    NAV.flatMap(g => g.items).filter(i => s.accessOf(i.id) !== 'off' && i.label.toLowerCase().includes(t)).forEach(i => r.push({ rt: i.id, label: i.label, sub: 'Page', go: () => s.go(i.id) }));
+    db.users.filter(x => (x.name + ' ' + x.email + ' ' + (x.org ?? '')).toLowerCase().includes(t)).forEach(x => r.push({ rt: 'users' as Route, label: x.name, sub: `User · ${x.role}`, go: () => s.go('users', x.id) }));
+    db.areas.filter(x => (x.name + ' ' + x.postcodes.join(' ')).toLowerCase().includes(t)).forEach(x => r.push({ rt: 'areas' as Route, label: `Area ${x.n} · ${x.name}`, sub: `${x.postcodes.slice(0, 6).join(', ')}`, go: () => s.go('areas', x.id) }));
+    db.templates.filter(x => (x.name + ' ' + x.subject).toLowerCase().includes(t)).forEach(x => r.push({ rt: 'templates' as Route, label: x.name, sub: `Message template · ${x.channel}`, go: () => s.go('templates', x.id) }));
+    db.reminders.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ rt: 'reminders' as Route, label: x.name, sub: 'Reminder', go: () => s.go('reminders', x.id) }));
+    db.checklists.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ rt: 'checklists' as Route, label: x.name, sub: 'Checklist', go: () => s.go('checklists', x.id) }));
+    db.agreements.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ rt: 'agreements' as Route, label: x.name, sub: 'Agreement', go: () => s.go('agreements', x.id) }));
+    db.docTemplates.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ rt: 'doctemplates' as Route, label: x.name, sub: 'Document template', go: () => s.go('doctemplates', x.id) }));
+    db.products.filter(x => (x.code + ' ' + x.name).toLowerCase().includes(t)).forEach(x => r.push({ rt: 'products' as Route, label: `${x.code} · ${x.name}`, sub: 'Product or service', go: () => s.go('products', x.code) }));
+    db.services.filter(x => x.name.toLowerCase().includes(t)).forEach(x => r.push({ rt: 'services' as Route, label: x.name, sub: 'Service', go: () => s.go('services', x.id) }));
+    return r.filter(x => s.accessOf(x.rt) !== 'off').slice(0, 9);
   }, [q, s, db]);
-  const notes = attention(db);
+  const notes = attention(db).filter(n => s.accessOf(n.r) !== 'off');
   const cal = [
     ...db.covers.filter(c => !c.ended).map(c => ({ d: c.from, t: `Holiday cover starts`, p: `Area ${db.areas.find(a => a.id === c.area)?.n ?? ''} · ends ${c.to}`, r: 'teams' as Route, id: null as string | null })),
     ...db.areas.filter(a => a.status === 'Planned' && a.opens).map(a => ({ d: a.opens, t: `Area ${a.n} opens`, p: `${a.waitlist.length} on the waiting list`, r: 'areas' as Route, id: a.id as string | null })),
     ...db.agreements.flatMap(g => g.versions.filter(v => v.status === 'Draft' || (v.status === 'Live' && daysFrom(v.effective) >= 0)).map(v => ({ d: v.effective, t: `${g.name} v${v.v}`, p: v.status === 'Draft' ? 'Draft · effective date' : 'Comes into effect', r: 'agreements' as Route, id: g.id as string | null }))),
     ...(db.tax.vatOn ? [] : [{ d: db.tax.vatFrom, t: 'VAT start date (if switched on)', p: `${db.tax.vatRate}% on LSP fees`, r: 'tax' as Route, id: null as string | null }]),
     { d: db.tax.certBy, t: 'Yearly tax certificates due', p: 'Overseas landlords', r: 'tax' as Route, id: null as string | null },
-  ].filter(c => daysFrom(c.d) >= 0).sort((a, b) => parseDate(a.d).getTime() - parseDate(b.d).getTime()).slice(0, 7);
+  ].filter(c => daysFrom(c.d) >= 0 && s.accessOf(c.r) !== 'off').sort((a, b) => parseDate(a.d).getTime() - parseDate(b.d).getTime()).slice(0, 7);
   return (
     <header className="header">
       {back && <IBtn icon={<ArrowLeft size={18} />} onClick={back} label="Back" />}

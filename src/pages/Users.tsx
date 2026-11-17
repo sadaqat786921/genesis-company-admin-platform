@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserPlus, Unlock, KeyRound, UserX, UserCheck, MailPlus, Users as UsersIc, ShieldCheck } from 'lucide-react';
+import { UserCog, UserPlus, Unlock, KeyRound, UserX, UserCheck, MailPlus, Users as UsersIc, ShieldCheck } from 'lucide-react';
 import { useStore, personName, staffIdOf } from '../store';
 import { areaLabel } from './Areas';
 import { nowStamp, ME_NAME } from '../data';
@@ -11,7 +11,7 @@ import type { User, Role } from '../seed';
 
 type TabId = 'staff' | 'Landlord' | 'Tenant' | 'Letting agent' | 'Contractor' | 'all';
 const STAFF_ROLES: Role[] = ['Company Admin', 'Supervisor', 'Office Admin'];
-const isStaff = (u: User) => STAFF_ROLES.includes(u.role);
+const isStaff = (u: User) => STAFF_ROLES.includes(u.role) || u.role === 'Sub Admin';
 const inTab = (u: User, t: TabId) => t === 'all' || (t === 'staff' ? isStaff(u) : t === 'Tenant' ? ['Tenant', 'Applicant'].includes(u.role) : u.role === t);
 
 /** People › Users: every login across the six portals. Invite staff, disable or enable, reset passwords and unlock accounts. */
@@ -73,7 +73,7 @@ function Invite({ onClose }: { onClose: () => void }) {
 function UserDrawer({ u, onClose }: { u: User; onClose: () => void }) {
   const s = useStore(); const { db } = s;
   const [act, setAct] = useState<'' | 'disable' | 'enable' | 'unlock' | 'reset' | 'resend'>('');
-  const staff = isStaff(u) || !!u.sub && !['Admin', 'Property manager', 'Accounts', 'Rent sharer'].includes(u.sub);
+  const staff = (STAFF_ROLES.includes(u.role)) || !!u.sub && !['Admin', 'Property manager', 'Accounts', 'Rent sharer'].includes(u.sub);
     const sid = staffIdOf(u); const curArea = db.areas.find(a => a.supervisor === sid || a.oas.includes(sid))?.id ?? '';
   const x = useDraft({ role: u.sub && staff ? u.sub : u.role as string, area: curArea });
   const base = STAFF_ROLES.includes(x.d.role as Role) ? x.d.role : 'Office Admin';
@@ -91,13 +91,14 @@ function UserDrawer({ u, onClose }: { u: User; onClose: () => void }) {
     {u.status === 'Locked' && <div className="alertbar a-err"><b className="grow">Locked after 5 wrong security codes.</b><Btn sm icon={<Unlock size={14} />} onClick={() => setAct('unlock')}>Unlock</Btn></div>}
     {u.status === 'Invited' && <div className="alertbar a-info"><b className="grow">Hasn't set a password yet.</b><Btn sm kind="outline" icon={<MailPlus size={14} />} onClick={() => setAct('resend')}>Resend invite</Btn></div>}
     <Facts items={[['Email', u.email], ['Phone', u.phone || '—'], ['Added', u.created], ['Last signed in', u.last]]} />
+    {u.role === 'Sub Admin' && <div className="alertbar a-info"><UserCog size={16} /><b className="grow">Sub Admin · their pages are chosen on the Sub Admins page.</b><Btn sm kind="outline" onClick={() => s.go('subadmins', u.id)}>Manage access</Btn></div>}
     {staff && !me ? <Card title="Role and area" className="flat">
       <Field label="Role"><Select value={x.d.role} onChange={v => x.patch({ role: v })} options={staffRoles.map(r => ({ value: r, label: r }))} /></Field>
       {base === 'Company Admin' ? <Note>A Company Admin sees every area.</Note> : <Field label={base === 'Supervisor' ? 'Their area (they see only this area)' : 'Area (they work in this Supervisor’s team)'}><Select value={x.d.area} onChange={v => x.patch({ area: v })} options={[{ value: '', label: 'Choose an area' }, ...[...db.areas].sort((a, b) => a.n - b.n).map(a => ({ value: a.id, label: `${areaLabel(a)}${a.supervisor && a.supervisor !== sid ? ' · ' + personName(db, a.supervisor) : ''}` }))]} /></Field>}
       {supTaken && <Note tone="err">{areaLabel(newArea!)} already has a Supervisor ({personName(db, newArea!.supervisor)}). Change it on the area page first.</Note>}
       {curArea && x.d.area !== curArea && base !== 'Company Admin' && <Note tone="warn">They leave {areaLabel(db.areas.find(a => a.id === curArea)!)}. {base === 'Supervisor' ? 'That area needs a new Supervisor.' : 'Move their landlords in Teams & cover.'}</Note>}
       <Btn sm kind="ghost" icon={<ShieldCheck size={14} />} onClick={() => s.go('roles')}>See what this role can do</Btn>
-    </Card> : <Note>{me ? "This is you. Another Company Admin can change your role." : `${u.role} logins are created by the flows in the staff portals. You can unlock, reset, disable or enable this login.`}</Note>}
+    </Card> : u.role === 'Sub Admin' ? null : <Note>{me ? "This is you. Another Company Admin can change your role." : `${u.role} logins are created by the flows in the staff portals. You can unlock, reset, disable or enable this login.`}</Note>}
     <div className="col" style={{ gap: 8 }}>
       <b className="h2" style={{ fontSize: 13 }}>Login</b>
       <div className="flex wrap">

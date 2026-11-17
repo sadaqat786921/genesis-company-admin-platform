@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Lock, Undo2, Save, X, Plus, Check, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { Btn, Modal, Field, InfoTip } from './ui';
+import { useStore } from './store';
 import { TOKENS, TOKEN_LABEL } from './seed';
 
 /* Building blocks every Company Admin page uses, so all pages look and behave the same:
@@ -21,7 +22,8 @@ export function Toggle({ on, onChange, label, disabled, title }: { on: boolean; 
 
 /** Sticky bar at the bottom of every editor: what changed, Undo and Save. Important changes ask for a short reason first. */
 export function SaveBar({ dirty, onUndo, onSave, important, note, saveLabel = 'Save changes', blocked }: { dirty: boolean; onUndo: () => void; onSave: (reason?: string) => void; important?: boolean | string; note?: ReactNode; saveLabel?: string; blocked?: string }) {
-  const [ask, setAsk] = useState(false);
+  const [ask, setAsk] = useState(false); const s = useStore();
+  if (s.accessOf(s.route) !== 'edit') return <div className="savebar" role="region" aria-label="View only"><Lock size={16} color="var(--text-tertiary)" /><div className="stack grow"><b>View only</b><span className="caption">You can look, but not change this page. Ask the Admin for edit access.</span></div></div>;
   return <>
     <div className={`savebar${dirty ? ' on' : ''}`} role="region" aria-label="Save changes">
       <span className={`svdot${dirty ? ' on' : ''}`} />

@@ -17,9 +17,13 @@ import { Stages } from './pages/Stages';
 import { Access, DocTemplates } from './pages/Documents';
 import { Agreements } from './pages/Agreements';
 import { Audit } from './pages/Audit';
+import { SubAdmins } from './pages/SubAdmins';
+import { Eye, Lock, ArrowLeft } from 'lucide-react';
+import { Btn, Empty } from './ui';
+import { LABEL } from './Shell';
 
 const PAGES: Record<R, () => React.ReactNode> = {
-  overview: Overview, company: Company, areas: Areas, plans: Plans, services: Services, products: Products, tax: Tax,
+  overview: Overview, subadmins: SubAdmins, company: Company, areas: Areas, plans: Plans, services: Services, products: Products, tax: Tax,
   users: Users, roles: Roles, teams: Teams,
   'onb-tenant': () => <Onboarding role="tenant" />, 'onb-landlord': () => <Onboarding role="landlord" />, 'onb-agent': () => <Onboarding role="agent" />, 'onb-contractor': () => <Onboarding role="contractor" />,
   reminders: Reminders, templates: Templates, checklists: Checklists, stages: Stages, access: Access, agreements: Agreements, doctemplates: DocTemplates, audit: Audit,
@@ -31,10 +35,14 @@ const write = (v: boolean) => { try { v ? sessionStorage.setItem(KEY, '1') : ses
 
 function Platform({ onLogout }: { onLogout: () => void }) {
   const s = useStore();
-  const Page = PAGES[s.route];
+  const Page = PAGES[s.route]; const acc = s.accessOf(s.route);
   return <div className="app">
     <Sidebar onLogout={onLogout} />
-    <main className="content" key={s.route + (s.detail ?? '')}><Page /></main>
+    <main className="content" key={s.route + (s.detail ?? '') + (s.viewAs?.id ?? '')}>
+      {s.viewAs && <div className="viewas"><Eye size={16} /><b className="grow">Prototype: you're seeing the portal as {s.viewAs.name} (Sub Admin){s.route === 'overview' ? '' : acc === 'view' ? ' · this page is view only' : acc === 'edit' ? ' · can edit this page' : ''}</b>
+        <Btn sm kind="outline" icon={<ArrowLeft size={14} />} onClick={() => { const id = s.viewAs!.id; s.setViewAs(null); s.go('subadmins', id); }}>Back to my view</Btn></div>}
+      {acc === 'off' ? <div className="card" style={{ marginTop: 8 }}><Empty icon={<Lock size={22} />}>{`You don't have access to ${LABEL[s.route]}. Ask the Admin if you need it.`}</Empty><div className="flex" style={{ justifyContent: 'center' }}><Btn kind="outline" onClick={() => s.go('overview')}>Go to the overview</Btn></div></div> : <Page />}
+    </main>
   </div>;
 }
 

@@ -31,5 +31,5 @@ export function attention(db: Db): Alert[] {
   return a;
 }
 
-export const roleTone = (r: string): Tone => (({ 'Company Admin': 'brand', Supervisor: 'brand', 'Office Admin': 'info', Landlord: 'ok', Tenant: 'neutral', Applicant: 'neutral', 'Letting agent': 'warn', Contractor: 'neutral' } as Record<string, Tone>)[r] ?? 'neutral');
+export const roleTone = (r: string): Tone => (({ 'Company Admin': 'brand', 'Sub Admin': 'brand', Supervisor: 'brand', 'Office Admin': 'info', Landlord: 'ok', Tenant: 'neutral', Applicant: 'neutral', 'Letting agent': 'warn', Contractor: 'neutral' } as Record<string, Tone>)[r] ?? 'neutral');
 export const statusTone = (s: string): Tone => (({ Active: 'ok', Live: 'ok', Invited: 'info', Planned: 'info', Draft: 'info', Disabled: 'neutral', Off: 'neutral', Retired: 'neutral', Locked: 'err' } as Record<string, Tone>)[s] ?? 'neutral');

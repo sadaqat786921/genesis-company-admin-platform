@@ -33,12 +33,15 @@ export interface Service { id: string; name: string; group: SvcGroup; to: ('Land
 export interface Product { code: string; name: string; desc: string; rate: number; kind: 'Service' | 'Labour' | 'Material'; on: boolean; used: number }
 export interface Tax { vatOn: boolean; vatNo: string; vatRate: number; vatFrom: string; nrlRate: number; hmrcRef: string; nrlRemind: number; certBy: string; budgetAlerts: number[] }
 
-export type Role = 'Company Admin' | 'Supervisor' | 'Office Admin' | 'Landlord' | 'Tenant' | 'Applicant' | 'Letting agent' | 'Contractor';
+export type Role = 'Company Admin' | 'Sub Admin' | 'Supervisor' | 'Office Admin' | 'Landlord' | 'Tenant' | 'Applicant' | 'Letting agent' | 'Contractor';
 export type UserStatus = 'Active' | 'Invited' | 'Disabled' | 'Locked';
 export interface User {
   id: string; name: string; email: string; phone: string; role: Role; /** Letting agent team role, or a custom staff role. */ sub?: string;
   org?: string; areas: string[]; status: UserStatus; last: string; twoStep: boolean; created: string; logins: string[];
+  /** Sub Admins only: which sidebar pages they can open, and whether they can change them. */ access?: Record<string, Access3>;
 }
+/** A Sub Admin's access to one sidebar page. */
+export type Access3 = 'off' | 'view' | 'edit';
 export interface Perm { id: string; group: string; label: string; /** Set by the client's flow chart: can't be changed here. */ core?: string }
 export interface RoleDef { id: string; name: string; kind: 'staff' | 'agent' | 'portal'; desc: string; perms: string[]; locked?: boolean; custom?: boolean }
 export interface LandlordRow { id: string; name: string; area: string; admin: string; homes: number; tasks: number }
@@ -177,6 +180,12 @@ export const USERS: User[] = [
   u('Priya Shah', 'p.shah@lsp.co.uk', 'Office Admin', 'Active', '14 Oct 2026, 17:31', ['AR3'], { phone: '020 7946 0013' }),
   u('Liam Murphy', 'l.murphy@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 09:15', ['AR1'], { phone: '020 7946 0014' }),
   u('Nadia Rossi', 'n.rossi@lsp.co.uk', 'Office Admin', 'Invited', '—', ['AR2'], { created: '13 Oct 2026, 11:20', twoStep: false }),
+  u('Hannah Lee', 'h.lee@lsp.co.uk', 'Sub Admin', 'Active', '15 Oct 2026, 09:20', ['AR1', 'AR2', 'AR3', 'AR4'], { created: '2 Sep 2026, 10:00', phone: '020 7946 0021',
+    access: { reminders: 'edit', templates: 'edit', checklists: 'edit', stages: 'view', doctemplates: 'edit', agreements: 'view', access: 'view', audit: 'view' } }),
+  u('Tom Reed', 't.reed@lsp.co.uk', 'Sub Admin', 'Active', '14 Oct 2026, 16:45', ['AR1', 'AR2', 'AR3', 'AR4'], { created: '2 Sep 2026, 10:05', phone: '020 7946 0022',
+    access: { users: 'edit', teams: 'view', 'onb-tenant': 'edit', 'onb-landlord': 'edit', 'onb-agent': 'edit', 'onb-contractor': 'edit', areas: 'view', audit: 'view' } }),
+  u('Zara Malik', 'z.malik@lsp.co.uk', 'Sub Admin', 'Invited', '—', ['AR1', 'AR2', 'AR3', 'AR4'], { created: '14 Oct 2026, 12:00', twoStep: false,
+    access: { company: 'view', plans: 'view', services: 'edit', products: 'edit', tax: 'view' } }),
   u('Ben Cole', 'b.cole@lsp.co.uk', 'Office Admin', 'Disabled', '30 Jun 2026, 16:02', [], { created: '5 Jan 2026, 10:00' }),
   u('Margaret Okafor', 'm.okafor@mail.co.uk', 'Landlord', 'Active', '14 Oct 2026, 20:12', ['AR1']),
   u('David Hughes', 'd.hughes@mail.co.uk', 'Landlord', 'Active', '14 Oct 2026, 09:22', ['AR3']),
@@ -640,6 +649,7 @@ export const DOC_TEMPLATES: DocTemplate[] = [
 let aid = 0;
 const au = (at: string, who: string, page: string, item: string, what: string, before: string, after: string, reason?: string): AuditEntry => ({ id: 'AU' + String(++aid).padStart(3, '0'), at, who, page, item, what, before, after, reason });
 export const AUDIT: AuditEntry[] = [
+  au('14 Oct 2026, 12:00', 'Michael Grant', 'Sub Admins', 'Zara Malik', 'Added a Sub Admin', '—', 'Company details, Plans, VAT & tax: view · Services & prices, Products & codes: edit', 'Helps with pricing'),
   au('14 Oct 2026, 16:30', 'Michael Grant', 'Agreements', 'Letting agent terms of business', 'Started a new draft version', '—', 'Version 3 (draft)'),
   au('13 Oct 2026, 11:20', 'Michael Grant', 'Users', 'Nadia Rossi', 'Invited a staff member', '—', 'Office Admin · West & South West', 'First Office Admin for Area 2'),
   au('8 Oct 2026, 14:22', 'Sarah Khan', 'Message templates', 'Landlord welcome and set password', 'Changed the message', 'Your account is ready.', 'Welcome to LSP. Your account is ready.'),

@@ -3,14 +3,14 @@ import { MapPinned, Users as UsersIc, BellRing, MessageSquareText, ListChecks, S
 import { useStore, personName, homesOf } from '../store';
 import { AREA_TONE } from './Areas';
 import { Card, Chip, Bar, Btn, Empty, Avatar, Modal } from '../ui';
-import { Head } from '../Shell';
+import { Head, NAV } from '../Shell';
 import { attention, liveOf, waitingOf, statusTone } from './lib';
 
 /** What needs a look, recent changes, agreements waiting for people, and users and areas at a glance. */
 export function Overview() {
   const s = useStore(); const { db } = s; const [reset, setReset] = useState(false);
-  const notes = attention(db);
-  const roles = ['Company Admin', 'Supervisor', 'Office Admin', 'Landlord', 'Tenant', 'Applicant', 'Letting agent', 'Contractor'] as const;
+  const notes = attention(db).filter(n => s.accessOf(n.r) !== 'off');
+  const roles = ['Company Admin', 'Sub Admin', 'Supervisor', 'Office Admin', 'Landlord', 'Tenant', 'Applicant', 'Letting agent', 'Contractor'] as const;
   const paused = db.reminders.filter(r => !r.on).length; const locked = db.users.filter(u => u.status === 'Locked').length;
   const tiles = [
     { r: 'areas' as const, ic: MapPinned, tone: 'brand', l: 'Live areas', n: db.areas.filter(a => a.status === 'Live').length, sub: db.unmatched.length ? `${db.unmatched.length} homes need one` : `of ${db.areas.length}`, st: db.unmatched.length ? 'warn' : '' },
@@ -24,7 +24,7 @@ export function Overview() {
   ];
   return <>
     <Head r="overview" />
-    <div className="ovgrid">{tiles.map(t => { const Ic = t.ic; return <button key={t.r} className="ovtile" onClick={() => s.go(t.r)} aria-label={`${t.l}: ${t.n}`}>
+    <div className="ovgrid">{tiles.filter(t => s.accessOf(t.r) !== 'off').map(t => { const Ic = t.ic; return <button key={t.r} className="ovtile" onClick={() => s.go(t.r)} aria-label={`${t.l}: ${t.n}`}>
       <span className={`tile t-${t.tone}`}><Ic size={16} /></span>
       <span className="ov-t"><span className="ov-l">{t.l}</span><span className="ov-v"><b>{t.n}</b><em className={t.st ? 'c-' + t.st : ''}>{t.sub}</em></span></span>
       <ArrowRight size={14} className="ov-go" />
@@ -36,12 +36,13 @@ export function Overview() {
           <div className="stack grow"><b>{n.t}</b><span className="caption">{n.d}</span></div><ArrowRight size={15} color="#98A2B3" /></button>)}</div>
           : <Empty icon={<ShieldCheck size={22} />}>Nothing needs a look right now.</Empty>}
       </Card>
-      <Card title="Recent changes" action={<Btn sm kind="ghost" icon={<History size={14} />} onClick={() => s.go('audit')}>Audit history</Btn>}>
+      {s.accessOf('audit') !== 'off' && <Card title="Recent changes" action={<Btn sm kind="ghost" icon={<History size={14} />} onClick={() => s.go('audit')}>Audit history</Btn>}>
         <div>{db.audit.slice(0, 7).map(a => <button key={a.id} className="rowlink" onClick={() => s.go('audit', a.id)}>
           <Avatar name={a.who} id={a.who === 'Michael Grant' ? 'ma' : a.who === 'Sarah Khan' ? 'sk' : undefined} />
           <div className="stack grow"><b>{a.what} · {a.item}</b><span className="caption">{a.page} · {a.who} · {a.at}</span></div></button>)}</div>
-      </Card>
+      </Card>}
     </div>
+    {s.viewAs ? <YourPages /> : <>
     <div className="grid g2">
       <Card title="Agreements" sub="How many people have accepted the live version" action={<Btn sm kind="ghost" onClick={() => s.go('agreements')}>Open</Btn>}>
         <div className="col" style={{ gap: 14 }}>{db.agreements.map(g => { const live = liveOf(g); const wait = waitingOf(g).length; const n = g.people.length; const done = n - wait; return <button key={g.id} className="stack" style={{ gap: 6, border: 0, background: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }} onClick={() => s.go('agreements', g.id)}>
@@ -68,7 +69,20 @@ export function Overview() {
         </div>
       </Card>
     </div>
+    </>}
     {reset && <Modal title="Reset demo data?" sub="Every change made in this demo is undone and the sample set-up comes back." onClose={() => setReset(false)}
       footer={<><Btn kind="outline" onClick={() => setReset(false)}>Cancel</Btn><Btn kind="danger" icon={<RotateCcw size={16} />} onClick={() => { s.reset(); setReset(false); }}>Reset demo data</Btn></>} />}
   </>;
+}
+
+/** A Sub Admin's overview: the pages they can open. */
+function YourPages() {
+  const s = useStore();
+  const pages = NAV.flatMap(g => g.items.map(i => ({ ...i, group: g.group }))).filter(i => i.id !== 'overview' && s.accessOf(i.id) !== 'off');
+  return <Card title="Your pages" sub="Chosen by the Admin. Ask them if you need more.">
+    {pages.length ? <div className="ovgrid">{pages.map(p => { const Ic = p.icon; const a = s.accessOf(p.id); return <button key={p.id} className="ovtile" onClick={() => s.go(p.id)}>
+      <span className={`tile t-${a === 'edit' ? 'brand' : 'neutral'}`}><Ic size={16} /></span>
+      <span className="ov-t"><span className="ov-l">{p.group}</span><span className="ov-v"><b style={{ fontSize: 13.5 }}>{p.label}</b><em className={a === 'edit' ? 'c-ok' : ''}>{a === 'edit' ? 'Can edit' : 'View only'}</em></span></span>
+    </button>; })}</div> : <Empty>No pages yet. Ask the Admin.</Empty>}
+  </Card>;
 }

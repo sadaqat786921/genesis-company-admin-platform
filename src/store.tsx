@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as D from './data';
 import * as S from './seed';
@@ -7,9 +7,9 @@ import * as S from './seed';
    Every save writes an Audit history entry (who, when, before → after, reason). Entries can't be edited or deleted.
    The demo keeps everything in sessionStorage; "Reset demo data" brings the seed back. */
 
-export type Route = 'overview' | 'company' | 'areas' | 'plans' | 'services' | 'products' | 'tax' | 'users' | 'roles' | 'teams'
+export type Route = 'overview' | 'subadmins' | 'company' | 'areas' | 'plans' | 'services' | 'products' | 'tax' | 'users' | 'roles' | 'teams'
   | 'onb-tenant' | 'onb-landlord' | 'onb-agent' | 'onb-contractor' | 'reminders' | 'templates' | 'checklists' | 'stages' | 'access' | 'agreements' | 'doctemplates' | 'audit';
-export const ROUTES: Route[] = ['overview', 'company', 'areas', 'plans', 'services', 'products', 'tax', 'users', 'roles', 'teams', 'onb-tenant', 'onb-landlord', 'onb-agent', 'onb-contractor', 'reminders', 'templates', 'checklists', 'stages', 'access', 'agreements', 'doctemplates', 'audit'];
+export const ROUTES: Route[] = ['overview', 'subadmins', 'company', 'areas', 'plans', 'services', 'products', 'tax', 'users', 'roles', 'teams', 'onb-tenant', 'onb-landlord', 'onb-agent', 'onb-contractor', 'reminders', 'templates', 'checklists', 'stages', 'access', 'agreements', 'doctemplates', 'audit'];
 
 export interface Db {
   company: S.Company; areas: S.Area[]; plans: S.Plan[]; services: S.Service[]; products: S.Product[]; tax: S.Tax;
@@ -22,7 +22,10 @@ const seed = (): Db => JSON.parse(JSON.stringify({
   onboarding: S.ONBOARDING, reminders: S.REMINDERS, templates: S.TEMPLATES, checklists: S.CHECKLISTS, processes: S.PROCESSES, picklists: S.PICKLISTS,
   docTypes: S.DOC_TYPES, agreements: S.AGREEMENTS, docTemplates: S.DOC_TEMPLATES, audit: S.AUDIT,
 }));
-const DB_KEY = 'genesis-ca-db-v2';
+const DB_KEY = 'genesis-ca-db-v3';
+const VIEW_KEY = 'genesis-ca-view-as';
+/** Pages a Sub Admin can never open, whatever the Admin ticks. */
+export const LOCKED_FOR_SUB: Partial<Record<Route, string>> = { subadmins: 'Only the main Admin creates Sub Admins and chooses their access. A Sub Admin can never give themselves more access.' };
 function load(): Db { try { const r = sessionStorage.getItem(DB_KEY); if (r) return { ...seed(), ...JSON.parse(r) }; } catch { /* storage blocked */ } return seed(); }
 
 export interface Change { page: string; item: string; what: string; before?: string; after?: string; reason?: string }
@@ -35,12 +38,18 @@ interface Store {
   /** Save several changes at once (one audit entry each). */
   commitMany: (parts: Partial<Db>, changes: Change[], msg?: string) => void;
   reset: () => void;
+  /** Prototype: see the portal as one Sub Admin (their sidebar and access). null = the main Admin. */
+  viewAs: S.User | null; setViewAs: (id: string | null) => void;
+  /** Access to a page for whoever is signed in: 'edit' for the main Admin. */
+  accessOf: (r: Route) => S.Access3;
+  /** Name saved in the Audit history for changes made now. */
+  actor: string;
 }
 const Ctx = createContext<Store>(null as unknown as Store);
 export const useStore = () => useContext(Ctx);
 
 let seq = 0;
-const entry = (c: Change): S.AuditEntry => ({ id: 'AU' + Date.now() + '-' + ++seq, at: D.nowStamp(), who: D.ME_NAME, page: c.page, item: c.item, what: c.what, before: c.before ?? '—', after: c.after ?? '—', reason: c.reason?.trim() || undefined });
+const entry = (c: Change, who: string): S.AuditEntry => ({ id: 'AU' + Date.now() + '-' + ++seq, at: D.nowStamp(), who, page: c.page, item: c.item, what: c.what, before: c.before ?? '—', after: c.after ?? '—', reason: c.reason?.trim() || undefined });
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const loc = useLocation(); const nav = useNavigate();
@@ -57,15 +66,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setToasts(t => [...t, { id, msg }]);
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2800);
   }, []);
+  const [viewId, setViewId] = useState<string | null>(() => { try { return sessionStorage.getItem(VIEW_KEY); } catch { return null; } });
+  const viewAs = viewId ? db.users.find(u => u.id === viewId && u.role === 'Sub Admin') ?? null : null;
+  const setViewAs = useCallback((id: string | null) => { setViewId(id); try { id ? sessionStorage.setItem(VIEW_KEY, id) : sessionStorage.removeItem(VIEW_KEY); } catch { /* ignore */ } }, []);
+  const accessOf = useCallback((r: Route): S.Access3 => !viewAs ? 'edit' : r === 'overview' ? 'view' : LOCKED_FOR_SUB[r] ? 'off' : r === 'audit' ? (viewAs.access?.audit === 'off' || !viewAs.access?.audit ? 'off' : 'view') : viewAs.access?.[r] ?? 'off', [viewAs]);
+  const actor = viewAs ? `${viewAs.name} (Sub Admin)` : D.ME_NAME;
+  // Saving is checked here, once, for every page: a view-only Sub Admin can never change anything.
+  const guard = useRef({ route, accessOf, actor }); guard.current = { route, accessOf, actor };
+  const blocked = () => { if (guard.current.accessOf(guard.current.route) !== 'edit') { toast('View only: ask the Admin for edit access'); return true; } return false; };
   const commit = useCallback(<K extends keyof Db>(key: K, next: Db[K], c: Change, msg = 'Saved') => {
-    setDb(d => ({ ...d, [key]: next, audit: [entry(c), ...d.audit] })); toast(msg);
-  }, [toast]);
+    if (blocked()) return; const who = guard.current.actor;
+    setDb(d => ({ ...d, [key]: next, audit: [entry(c, who), ...d.audit] })); toast(msg);
+  }, [toast]); // eslint-disable-line react-hooks/exhaustive-deps
   const commitMany = useCallback((p: Partial<Db>, cs: Change[], msg = 'Saved') => {
-    setDb(d => ({ ...d, ...p, audit: [...cs.map(entry).reverse(), ...d.audit] })); toast(msg);
-  }, [toast]);
-  const reset = useCallback(() => { setDb(seed()); toast('Demo data reset'); }, [toast]);
+    if (blocked()) return; const who = guard.current.actor;
+    setDb(d => ({ ...d, ...p, audit: [...cs.map(c => entry(c, who)).reverse(), ...d.audit] })); toast(msg);
+  }, [toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reset = useCallback(() => { setDb(seed()); setViewAs(null); toast('Demo data reset'); }, [toast, setViewAs]);
 
-  const value = useMemo(() => ({ route, detail, go, toast, toasts, db, commit, commitMany, reset }), [route, detail, go, toast, toasts, db, commit, commitMany, reset]);
+  const value = useMemo(() => ({ route, detail, go, toast, toasts, db, commit, commitMany, reset, viewAs, setViewAs, accessOf, actor }), [route, detail, go, toast, toasts, db, commit, commitMany, reset, viewAs, setViewAs, accessOf, actor]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
