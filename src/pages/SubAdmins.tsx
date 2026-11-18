@@ -138,7 +138,9 @@ function NewSubAdmin() {
   const [leave, setLeave] = useState(false);
   const dup = db.users.some(u => u.email.toLowerCase() === email.trim().toLowerCase());
   const st = strong(pw);
-  const okDetails = name.trim().includes(' ') && /^\S+@\S+\.\S+$/.test(email) && !dup && /^0\d{9,10}$/.test(phone.replace(/\s/g, '')) && st.len && st.num && st.mix;
+  const digits = phone.replace(/\D/g, '').replace(/^44/, '0');
+  const missing = [!name.trim().includes(' ') && 'their first and last name', (!/^\S+@\S+\.\S+$/.test(email) || dup) && (dup ? 'an email nobody else uses' : 'a valid email'), !/^0\d{9,10}$/.test(digits) && 'a mobile number (11 digits, e.g. 07700 900123)', !(st.len && st.num && st.mix) && 'a strong password'].filter(Boolean) as string[];
+  const okDetails = missing.length === 0;
   const c = count(a);
   const okAccess = c.on > 0;
   const started = name || email || pw || c.on;
@@ -155,7 +157,8 @@ function NewSubAdmin() {
         <div className="grid g2"><Field label="Full name"><Text value={name} onChange={setName} placeholder="e.g. Hannah Lee" /></Field>
           <Field label="Work email (their login)"><Text value={email} onChange={v => setEmail(v.trim())} placeholder="name@lsp.co.uk" /></Field></div>
         {dup && <Note tone="err">Someone already uses this email.</Note>}
-        <Field label="Mobile" hint="Their 6-digit security code is sent here every time they sign in"><Text value={phone} onChange={setPhone} placeholder="07700 900123" /></Field>
+        <Field label="Mobile" hint="Their 6-digit security code is sent here every time they sign in. Spaces and dashes are fine."><Text value={phone} onChange={setPhone} placeholder="07700 900123" /></Field>
+        {phone && !/^0\d{9,10}$/.test(digits) && <Note tone="err">That mobile number looks too short or too long. UK mobiles have 11 digits, e.g. 07700 900123.</Note>}
         <Field label="Password">
           <div className="flex"><div style={{ position: 'relative', flex: 1 }}><input className="input" aria-label="Password" type={show ? 'text' : 'password'} value={pw} onChange={e => setPw(e.target.value)} autoComplete="new-password" />
             <button type="button" onClick={() => setShow(v => !v)} aria-label="Show password" style={{ position: 'absolute', right: 10, top: 11, border: 0, background: 'none', color: 'var(--text-tertiary)' }}>{show ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
@@ -191,7 +194,7 @@ function NewSubAdmin() {
       </Card></div>
     </div>}
     <div className="savebar on" role="region" aria-label="Steps">
-      <div className="stack grow"><b>Step {step + 1} of 3 · {['Their details', 'Sidebar access', 'Check and invite'][step]}</b><span className="caption">{step === 0 ? (okDetails ? 'Ready for the next step.' : 'Add their name, email, mobile and a strong password.') : step === 1 ? (okAccess ? `${c.on} pages on · ${c.edit} can edit` : 'Switch on at least one page.') : 'Nothing is sent until you press Invite.'}</span></div>
+      <div className="stack grow"><b>Step {step + 1} of 3 · {['Their details', 'Sidebar access', 'Check and invite'][step]}</b><span className="caption">{step === 0 ? (okDetails ? 'Ready for the next step.' : `Still needed: ${missing.join(', ')}.`) : step === 1 ? (okAccess ? `${c.on} pages on · ${c.edit} can edit` : 'Switch on at least one page.') : 'Nothing is sent until you press Invite.'}</span></div>
       <Btn kind="outline" onClick={() => step ? setStep(step - 1) : started ? setLeave(true) : s.go('subadmins')}>{step ? 'Back' : 'Cancel'}</Btn>
       {step < 2 ? <Btn disabled={step === 0 ? !okDetails : !okAccess} onClick={() => setStep(step + 1)}>Next</Btn> : <Btn icon={<Send size={16} />} onClick={invite}>Invite Sub Admin</Btn>}
     </div>
