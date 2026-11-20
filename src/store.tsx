@@ -7,22 +7,22 @@ import * as S from './seed';
    Every save writes an Audit history entry (who, when, before → after, reason). Entries can't be edited or deleted.
    The demo keeps everything in sessionStorage; "Reset demo data" brings the seed back. */
 
-export type Route = 'overview' | 'subadmins' | 'company' | 'areas' | 'plans' | 'services' | 'products' | 'tax' | 'users' | 'roles' | 'teams'
+export type Route = 'overview' | 'subadmins' | 'broadcasts' | 'company' | 'areas' | 'plans' | 'services' | 'products' | 'tax' | 'users' | 'roles' | 'teams'
   | 'onb-tenant' | 'onb-landlord' | 'onb-agent' | 'onb-contractor' | 'reminders' | 'templates' | 'checklists' | 'stages' | 'access' | 'agreements' | 'doctemplates' | 'audit';
-export const ROUTES: Route[] = ['overview', 'subadmins', 'company', 'areas', 'plans', 'services', 'products', 'tax', 'users', 'roles', 'teams', 'onb-tenant', 'onb-landlord', 'onb-agent', 'onb-contractor', 'reminders', 'templates', 'checklists', 'stages', 'access', 'agreements', 'doctemplates', 'audit'];
+export const ROUTES: Route[] = ['overview', 'subadmins', 'broadcasts', 'company', 'areas', 'plans', 'services', 'products', 'tax', 'users', 'roles', 'teams', 'onb-tenant', 'onb-landlord', 'onb-agent', 'onb-contractor', 'reminders', 'templates', 'checklists', 'stages', 'access', 'agreements', 'doctemplates', 'audit'];
 
 export interface Db {
   company: S.Company; areas: S.Area[]; plans: S.Plan[]; services: S.Service[]; products: S.Product[]; tax: S.Tax;
   users: S.User[]; roles: S.RoleDef[]; landlords: S.LandlordRow[]; shares: S.ShareReq[]; covers: S.Cover[]; unmatched: S.Unmatched[]; onboarding: Record<S.OnbRole, S.Onboarding>;
   reminders: S.Reminder[]; templates: S.Template[]; checklists: S.Checklist[]; processes: S.Process[]; picklists: S.PickList[];
-  docTypes: S.DocType[]; agreements: S.Agreement[]; docTemplates: S.DocTemplate[]; audit: S.AuditEntry[];
+  docTypes: S.DocType[]; agreements: S.Agreement[]; docTemplates: S.DocTemplate[]; audit: S.AuditEntry[]; broadcasts: S.Broadcast[];
 }
 const seed = (): Db => JSON.parse(JSON.stringify({
   company: S.COMPANY, areas: S.AREAS, plans: S.PLANS, services: S.SERVICES, products: S.PRODUCTS, tax: S.TAX, users: S.USERS, roles: S.ROLES, landlords: S.LANDLORD_ROWS, shares: S.SHARES, covers: S.COVERS, unmatched: S.UNMATCHED,
   onboarding: S.ONBOARDING, reminders: S.REMINDERS, templates: S.TEMPLATES, checklists: S.CHECKLISTS, processes: S.PROCESSES, picklists: S.PICKLISTS,
-  docTypes: S.DOC_TYPES, agreements: S.AGREEMENTS, docTemplates: S.DOC_TEMPLATES, audit: S.AUDIT,
+  docTypes: S.DOC_TYPES, agreements: S.AGREEMENTS, docTemplates: S.DOC_TEMPLATES, audit: S.AUDIT, broadcasts: S.BROADCASTS,
 }));
-const DB_KEY = 'genesis-ca-db-v3';
+const DB_KEY = 'genesis-ca-db-v4';
 const VIEW_KEY = 'genesis-ca-view-as';
 /** Pages a Sub Admin can never open, whatever the Admin ticks. */
 export const LOCKED_FOR_SUB: Partial<Record<Route, string>> = { subadmins: 'Only the main Admin creates Sub Admins and chooses their access. A Sub Admin can never give themselves more access.' };

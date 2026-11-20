@@ -177,7 +177,7 @@ export const USERS: User[] = [
   u('Sarah Khan', 's.khan@lsp.co.uk', 'Supervisor', 'Active', '15 Oct 2026, 08:55', ['AR1'], { phone: '020 7946 0001', created: '1 Dec 2025, 09:30' }),
   u('Marcus Bell', 'm.bell@lsp.co.uk', 'Supervisor', 'Active', '15 Oct 2026, 08:31', ['AR3'], { phone: '020 7946 0003', created: '5 Jan 2026, 09:00' }),
   u('Emma Thompson', 'e.thompson@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 09:02', ['AR1'], { phone: '020 7946 0011' }),
-  u('James Carter', 'j.carter@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 08:47', ['AR1'], { phone: '020 7946 0012' }),
+  u('James Carter', 'j.carter@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 08:47', ['AR3'], { phone: '020 7946 0012' }),
   u('Priya Shah', 'p.shah@lsp.co.uk', 'Office Admin', 'Active', '14 Oct 2026, 17:31', ['AR3'], { phone: '020 7946 0013' }),
   u('Liam Murphy', 'l.murphy@lsp.co.uk', 'Office Admin', 'Active', '15 Oct 2026, 09:15', ['AR1'], { phone: '020 7946 0014' }),
   u('Nadia Rossi', 'n.rossi@lsp.co.uk', 'Office Admin', 'Invited', '—', ['AR2'], { created: '13 Oct 2026, 11:20', twoStep: false }),
@@ -651,6 +651,7 @@ let aid = 0;
 const au = (at: string, who: string, page: string, item: string, what: string, before: string, after: string, reason?: string): AuditEntry => ({ id: 'AU' + String(++aid).padStart(3, '0'), at, who, page, item, what, before, after, reason });
 export const AUDIT: AuditEntry[] = [
   au('14 Oct 2026, 12:00', 'Michael Grant', 'Sub Admins', 'Zara Malik', 'Added a Sub Admin', '—', 'Company details, Plans, VAT & tax: view · Services & prices, Products & codes: edit', 'Helps with pricing'),
+  au('14 Oct 2026, 11:30', 'Michael Grant', 'Send a message', 'Office closed over Christmas', 'Scheduled an announcement', '—', 'Everyone · in-app and email · 15 Dec 2026, 09:00'),
   au('14 Oct 2026, 16:30', 'Michael Grant', 'Agreements', 'Letting agent terms of business', 'Started a new draft version', '—', 'Version 3 (draft)'),
   au('13 Oct 2026, 11:20', 'Michael Grant', 'Users', 'Nadia Rossi', 'Invited a staff member', '—', 'Office Admin · West & South West', 'First Office Admin for Area 2'),
   au('8 Oct 2026, 14:22', 'Sarah Khan', 'Message templates', 'Landlord welcome and set password', 'Changed the message', 'Your account is ready.', 'Welcome to LSP. Your account is ready.'),
@@ -664,4 +665,40 @@ export const AUDIT: AuditEntry[] = [
   au('2 Jun 2026, 10:00', 'Sarah Khan', 'Checklists', 'Routine inspection', 'Changed a rule', 'How often: Every 3 months', 'How often: Every 6 months', 'Client decision'),
   au('30 Jun 2026, 16:05', 'Michael Grant', 'Users', 'Ben Cole', 'Disabled a user', 'Active', 'Disabled', 'Left the company'),
   au('20 Mar 2026, 10:00', 'Sarah Khan', 'Agreements', 'Landlord management agreement', 'Published version 2', 'Version 1', 'Version 2 · everyone must accept again', 'Repair budget alerts added'),
+];
+
+/* ======================= messages the Admin sends (announcements, reminders, one-off messages) ======================= */
+export type BKind = 'Announcement' | 'Reminder' | 'Message';
+/** Who it goes to: everyone, whole groups, or picked people. Groups can be narrowed to some areas. */
+export interface SendTo { mode: 'everyone' | 'groups' | 'people'; groups: Role[]; people: string[]; areas: string[] }
+export interface Delivery { user: string; status: 'Waiting' | 'Delivered' | 'Read' | 'Failed' }
+export interface Broadcast {
+  id: string; kind: BKind; title: string; body: string; channels: MsgChannel[];
+  /** Announcements show as a banner at the top of each portal's home page until this date. */ bannerUntil?: string; tone: 'info' | 'warn' | 'ok';
+  /** Reminders: the date it is about, and how many days before to remind. */ eventDate?: string; remindDays?: number[];
+  audience: SendTo; when: 'now' | 'later'; sendAt: string;
+  status: 'Draft' | 'Scheduled' | 'Sent' | 'Cancelled'; by: string; at: string; deliveries: Delivery[]; note?: string;
+}
+const ids = (names: string[]) => names.map(n => USERS.find(u => u.name === n)!.id);
+const dl = (names: string[], read = 0): Delivery[] => ids(names).map((u, i) => ({ user: u, status: i < read ? 'Read' : 'Delivered' }));
+export const BROADCASTS: Broadcast[] = [
+  { id: 'BC1', kind: 'Announcement', title: 'Office closed over Christmas', tone: 'warn', channels: ['In-app', 'Email'], bannerUntil: '2 Jan 2027',
+    body: 'Hi {first_name},\n\nOur office is closed from 24 December to 1 January. For emergencies (no heating, leaks, no electricity) call {office_phone} — the emergency line stays open every day.\n\nMerry Christmas from everyone at LSP.',
+    audience: { mode: 'everyone', groups: [], people: [], areas: [] }, when: 'later', sendAt: '15 Dec 2026, 09:00', status: 'Scheduled', by: 'Michael Grant', at: '14 Oct 2026, 11:30', deliveries: [] },
+  { id: 'BC2', kind: 'Reminder', title: 'Gas safety week: check your alarms', tone: 'info', channels: ['Email', 'In-app'], eventDate: '19 Oct 2026', remindDays: [3],
+    body: 'Hi {first_name},\n\nGas Safety Week starts on {date}. Please test the carbon monoxide alarm in your home and tell us if it doesn\'t work.',
+    audience: { mode: 'groups', groups: ['Landlord', 'Tenant'], people: [], areas: [] }, when: 'now', sendAt: '12 Oct 2026, 10:00', status: 'Sent', by: 'Michael Grant', at: '12 Oct 2026, 10:00',
+    deliveries: [...dl(['Margaret Okafor', 'David Hughes', 'Rachel Evans', 'Tom Ahmed', 'Karen Patel', 'Simon Wright'], 4), ...dl(['Daniel Price', 'Michael Okafor', 'Jay Patel', 'Liz Brown', 'Megan Price'], 3)] },
+  { id: 'BC3', kind: 'Reminder', title: 'Hand in October rent records', tone: 'info', channels: ['In-app', 'Email'], eventDate: '31 Oct 2026', remindDays: [7, 1],
+    body: 'Hi {first_name},\n\nPlease record every rent payment received in October by {date}, so landlord statements go out on time.',
+    audience: { mode: 'groups', groups: ['Office Admin'], people: [], areas: [] }, when: 'later', sendAt: '24 Oct 2026, 09:00', status: 'Scheduled', by: 'Sarah Khan', at: '10 Oct 2026, 15:00', deliveries: [] },
+  { id: 'BC4', kind: 'Message', title: 'Your account is unlocked', tone: 'ok', channels: ['Email', 'Text'],
+    body: 'Hi {first_name},\n\nWe have unlocked your account. You can sign in again with your usual password.',
+    audience: { mode: 'people', groups: [], people: ids(['Helen Brooks']), areas: [] }, when: 'now', sendAt: '13 Oct 2026, 22:30', status: 'Sent', by: 'Michael Grant', at: '13 Oct 2026, 22:30', deliveries: dl(['Helen Brooks'], 1) },
+  { id: 'BC5', kind: 'Announcement', title: 'New: pay invoices by card', tone: 'ok', channels: ['In-app'], bannerUntil: '30 Nov 2026',
+    body: 'You can now pay LSP invoices by card from Invoices & Payments. Paid straight away, with a receipt.',
+    audience: { mode: 'groups', groups: ['Letting agent'], people: [], areas: [] }, when: 'now', sendAt: '1 Oct 2026, 09:00', status: 'Sent', by: 'Michael Grant', at: '1 Oct 2026, 09:00',
+    deliveries: dl(['Claire Rose', 'Tom Fielding', 'Anita Shah', 'Ian Walsh', 'Lucy Green'], 3) },
+  { id: 'BC6', kind: 'Announcement', title: 'New Year rent reminder', tone: 'info', channels: ['Email'], body: 'Hi {first_name},\n\nA reminder that January rent is due on 1 January as usual.',
+    audience: { mode: 'groups', groups: ['Tenant'], people: [], areas: [] }, when: 'later', sendAt: '28 Dec 2026, 10:00', status: 'Draft', by: 'Michael Grant', at: '14 Oct 2026, 16:40', deliveries: [] },
 ];

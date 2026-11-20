@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   LayoutDashboard, Building2, MapPinned, BadgePercent, Wrench, Barcode, Landmark, Users, ShieldCheck, Network, KeyRound, Home, Briefcase, HardHat,
   BellRing, MessageSquareText, ListChecks, Workflow, FolderLock, ScrollText, FileText, History,
-  UserCog, PanelLeft, LogOut, Search, Bell, CalendarDays, ChevronRight, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldAlert, Check, RotateCcw, MoreVertical,
+  UserCog, Megaphone, PanelLeft, LogOut, Search, Bell, CalendarDays, ChevronRight, ArrowRight, ArrowLeft, Eye, EyeOff, ShieldAlert, Check, RotateCcw, MoreVertical,
 } from 'lucide-react';
 import { useStore, type Route } from './store';
 import { daysFrom, parseDate, LSP_PHONE, ME_NAME, ME_EMAIL } from './data';
@@ -14,7 +14,7 @@ export const NAV: { group: string; items: { id: Route; label: string; icon: type
   { group: 'Business', items: [{ id: 'company', label: 'Company details', icon: Building2 }, { id: 'areas', label: 'Areas', icon: MapPinned }, { id: 'plans', label: 'Plans', icon: BadgePercent }, { id: 'services', label: 'Services & prices', icon: Wrench }, { id: 'products', label: 'Products & codes', icon: Barcode }, { id: 'tax', label: 'VAT & tax', icon: Landmark }] },
   { group: 'People', items: [{ id: 'users', label: 'Users', icon: Users }, { id: 'subadmins', label: 'Sub Admins', icon: UserCog }, { id: 'roles', label: 'Roles & permissions', icon: ShieldCheck }, { id: 'teams', label: 'Teams & cover', icon: Network }] },
   { group: 'Onboarding', items: [{ id: 'onb-tenant', label: 'Tenant onboarding', icon: KeyRound }, { id: 'onb-landlord', label: 'Landlord onboarding', icon: Home }, { id: 'onb-agent', label: 'Letting agent onboarding', icon: Briefcase }, { id: 'onb-contractor', label: 'Contractor onboarding', icon: HardHat }] },
-  { group: 'Messages & work', items: [{ id: 'reminders', label: 'Reminders', icon: BellRing }, { id: 'templates', label: 'Message templates', icon: MessageSquareText }, { id: 'checklists', label: 'Checklists', icon: ListChecks }, { id: 'stages', label: 'Stages & lists', icon: Workflow }] },
+  { group: 'Messages & work', items: [{ id: 'broadcasts', label: 'Send a message', icon: Megaphone }, { id: 'reminders', label: 'Reminders', icon: BellRing }, { id: 'templates', label: 'Message templates', icon: MessageSquareText }, { id: 'checklists', label: 'Checklists', icon: ListChecks }, { id: 'stages', label: 'Stages & lists', icon: Workflow }] },
   { group: 'Documents & records', items: [{ id: 'access', label: 'Document access', icon: FolderLock }, { id: 'agreements', label: 'Agreements', icon: ScrollText }, { id: 'doctemplates', label: 'Document templates', icon: FileText }, { id: 'audit', label: 'Audit history', icon: History }] },
 ];
 export const LABEL: Record<Route, string> = Object.fromEntries(NAV.flatMap(g => g.items.map(i => [i.id, i.label]))) as Record<Route, string>;
@@ -81,6 +81,7 @@ export function PageHeader({ title, action, crumbs, back }: { title: ReactNode; 
   }, [q, s, db]);
   const notes = attention(db).filter(n => s.accessOf(n.r) !== 'off');
   const cal = [
+    ...db.broadcasts.filter(b => b.status === 'Scheduled').map(b => ({ d: b.sendAt.split(',')[0], t: b.title, p: `${b.kind} · sends at ${b.sendAt.split(', ')[1] ?? ''}`, r: 'broadcasts' as Route, id: b.id as string | null })),
     ...db.covers.filter(c => !c.ended).map(c => ({ d: c.from, t: `Holiday cover starts`, p: `Area ${db.areas.find(a => a.id === c.area)?.n ?? ''} · ends ${c.to}`, r: 'teams' as Route, id: null as string | null })),
     ...db.areas.filter(a => a.status === 'Planned' && a.opens).map(a => ({ d: a.opens, t: `Area ${a.n} opens`, p: `${a.waitlist.length} on the waiting list`, r: 'areas' as Route, id: a.id as string | null })),
     ...db.agreements.flatMap(g => g.versions.filter(v => v.status === 'Draft' || (v.status === 'Live' && daysFrom(v.effective) >= 0)).map(v => ({ d: v.effective, t: `${g.name} v${v.v}`, p: v.status === 'Draft' ? 'Draft · effective date' : 'Comes into effect', r: 'agreements' as Route, id: g.id as string | null }))),

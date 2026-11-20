@@ -18,6 +18,7 @@ import { Access, DocTemplates } from './pages/Documents';
 import { Agreements } from './pages/Agreements';
 import { Audit } from './pages/Audit';
 import { SubAdmins } from './pages/SubAdmins';
+import { Broadcasts } from './pages/Broadcasts';
 import { Eye, Lock, ArrowLeft } from 'lucide-react';
 import { Btn, Empty } from './ui';
 import { LABEL } from './Shell';
@@ -26,7 +27,7 @@ const PAGES: Record<R, () => React.ReactNode> = {
   overview: Overview, subadmins: SubAdmins, company: Company, areas: Areas, plans: Plans, services: Services, products: Products, tax: Tax,
   users: Users, roles: Roles, teams: Teams,
   'onb-tenant': () => <Onboarding role="tenant" />, 'onb-landlord': () => <Onboarding role="landlord" />, 'onb-agent': () => <Onboarding role="agent" />, 'onb-contractor': () => <Onboarding role="contractor" />,
-  reminders: Reminders, templates: Templates, checklists: Checklists, stages: Stages, access: Access, agreements: Agreements, doctemplates: DocTemplates, audit: Audit,
+  broadcasts: Broadcasts, reminders: Reminders, templates: Templates, checklists: Checklists, stages: Stages, access: Access, agreements: Agreements, doctemplates: DocTemplates, audit: Audit,
 };
 
 const KEY = 'genesis-ca-signed-in';
