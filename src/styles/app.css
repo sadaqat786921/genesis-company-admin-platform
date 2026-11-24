@@ -1147,3 +1147,37 @@ tr.static { cursor: default; } tr.static:hover td { background: none; }
 .acc-row.lockd { background: var(--bg-muted); justify-content: space-between; }
 .acc-l { display: flex; align-items: center; gap: 10px; flex: 1; font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .acc-l svg { color: var(--text-tertiary); }
+
+/* ---------- Agreements and document templates: documents on A4 pages ---------- */
+.ag-sum { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 12.5px; color: var(--text-secondary); }
+.docwrap.pages { border-radius: 8px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.paper.a4 { width: 100%; max-width: 760px; min-height: 1000px; border-radius: 4px; gap: 18px; padding: 48px 56px 28px; }
+.paper.a4.edit { min-height: 900px; }
+.docwrap .paper.a4 + .paper.a4 { margin-top: 0; }
+.ag-body { display: flex; flex-direction: column; gap: 10px; }
+.ag-h, .ag-ed h2 { margin: 10px 0 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.ag-p, .ag-ed p, .ag-ed div { margin: 0; font-size: 12.5px; line-height: 1.75; color: var(--text-secondary); white-space: pre-wrap; }
+.ag-ed { outline: none; display: flex; flex-direction: column; gap: 10px; min-height: 700px; cursor: text; }
+.ag-ed p:only-child:has(br:only-child)::before, .ag-ed:empty::before { content: attr(data-ph); color: var(--text-placeholder); }
+.ag-ed h2:first-child { margin-top: 0; }
+.edtool { position: sticky; top: 12px; z-index: 3; width: 100%; max-width: 760px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-default); border-radius: 8px; box-shadow: 0 4px 12px rgba(15,24,40,.05); }
+.pin { width: 100%; border: 1px dashed transparent; border-radius: 6px; background: transparent; font: inherit; color: inherit; padding: 6px 8px; margin: -6px -8px; resize: none; overflow: hidden; }
+.pin:hover { border-color: var(--border-strong); }
+.pin:focus { outline: none; border-color: var(--border-brand); background: var(--bg-brand-subtle); }
+.pin::placeholder { color: var(--text-placeholder); }
+.pin-body { font-size: 13px; line-height: 1.7; color: var(--text-primary); min-height: 220px; }
+.doc-f .pin { color: var(--text-placeholder); font-size: 11.5px; }
+.tpl .doc-title.pin { font-size: 20px; font-weight: 500; color: var(--text-brand); }
+.tokl { display: flex; flex-direction: column; gap: 2px; max-height: 420px; overflow: auto; margin: 0 -6px; }
+.tokl button { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-primary); text-align: left; cursor: pointer; }
+.tokl button:hover { background: var(--bg-brand-subtle); color: var(--text-brand); }
+.tokl .caption { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+@media (max-width: 760px) { .paper.a4 { padding: 28px 20px; min-height: 0; } .docwrap.pages { padding: 10px; } }
+.paper.a4 .doc-logo { height: 30px; }
+.paper.a4 .doc-h .stack span { white-space: nowrap; }
+.adm-split.tpl { grid-template-columns: minmax(0, 1fr) 320px; }
+.tpl .paper, .tpl .paper.a4 { min-height: 620px; }
+.tpl .docwrap { padding: 16px; }
+.tpl .minisearch { width: 100%; }
+@media (max-width: 1180px) { .adm-split.tpl { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .paper.a4 .doc-h { flex-wrap: wrap; } .paper.a4 .doc-h .stack { align-items: flex-start !important; } .paper.a4 .doc-h .stack span { white-space: normal; } }

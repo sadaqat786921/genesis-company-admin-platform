@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { FolderLock, Plus, Lock, Check, FileText, Star, Copy, Trash2, EyeOff } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { FolderLock, Plus, Lock, Check, FileText, Star, Copy, Trash2, EyeOff, Pencil } from 'lucide-react';
 import { useStore } from '../store';
 import { nowStamp, ME_NAME } from '../data';
-import { Card, Chip, Btn, Field, Text, Select, Empty, Note, InfoTip, Modal, Drawer, PageTabs } from '../ui';
+import { Card, Chip, Btn, Field, Text, Select, Empty, InfoTip, Modal, Drawer, MiniSearch, MoreMenu, PageTabs } from '../ui';
 import { Head } from '../Shell';
-import { useDraft, SaveBar, Toggle, Locked, TokenFields, Paper, unknownTokens, tokensIn } from '../admin';
-import { AUDIENCES, WHENS, TOKENS, type Audience, type DocType, type DocTemplate, type Variant } from '../seed';
+import { useDraft, SaveBar, Toggle, Locked, Paper, unknownTokens, tokensIn } from '../admin';
+import { AUDIENCES, WHENS, TOKENS, TOKEN_LABEL, type Audience, type DocType, type DocTemplate, type Variant } from '../seed';
 
 /** Documents & records › Document access: who can see each kind of document, and when it appears. Staff-only documents are locked. */
 export function Access() {
@@ -61,41 +61,94 @@ export function DocTemplates() {
   const { db } = s;
   return <>
     <Head r="doctemplates" />
-    <Card title={<span className="clean-h">Templates on LSP paper<InfoTip>Every template uses the logo, address and legal line from Company details. Some have more than one version: the default is used unless staff choose another.</InfoTip></span>}>
-      {db.docTemplates.length ? <div className="tablewrap"><table className="t"><thead><tr><th>Template</th><th>Used for</th><th>Versions</th><th>Default</th><th>Last changed</th></tr></thead><tbody>
+    <Card>
+      {db.docTemplates.length ? <div className="tablewrap"><table className="t"><thead><tr><th>Template</th><th>Used for</th><th>Versions</th><th>Last changed</th></tr></thead><tbody>
         {db.docTemplates.map(t => <tr key={t.id} onClick={() => s.go('doctemplates', t.id)}>
-          <td><span className="flex"><span className="tile t-brand" style={{ width: 30, height: 30 }}><FileText size={14} /></span><b className="strong">{t.name}</b></span></td><td className="small">{t.usedFor}</td><td>{t.variants.length}</td>
-          <td><Chip tone="ok">{t.variants.find(v => v.isDefault)?.name}</Chip></td><td className="small"><span className="stack"><span>{t.at.split(',')[0]}</span><span className="caption">{t.by}</span></span></td>
+          <td><span className="flex"><span className="tile t-brand" style={{ width: 30, height: 30 }}><FileText size={14} /></span><b className="strong">{t.name}</b></span></td><td className="small">{t.usedFor}</td><td className="small">{t.variants.length}</td>
+          <td className="small">{t.at.split(',')[0]} · {t.by}</td>
         </tr>)}
       </tbody></table></div> : <Empty icon={<FileText size={22} />}>No templates yet.</Empty>}
     </Card>
   </>;
 }
+
+/* In the editor a detail shows as [Full name]; it is saved as {full_name}. */
+const KEY_OF: Record<string, string> = Object.fromEntries(Object.entries(TOKEN_LABEL).map(([k, l]) => [l, k]));
+const toView = (t: string) => t.replace(/\{(\w+)\}/g, (m, k) => TOKEN_LABEL[k] ? `[${TOKEN_LABEL[k]}]` : m);
+const toStore = (t: string) => t.replace(/\[([^\]\n]+)\]/g, (m, l) => KEY_OF[l] ? `{${KEY_OF[l]}}` : m);
+const COMMON = ['full_name', 'company', 'address', 'date', 'amount', 'due_date', 'reference', 'bank_details', 'office_admin', 'office_phone'];
+
 function DocTemplatePage({ id }: { id: string }) {
   const s = useStore(); const { db } = s; const t0 = db.docTemplates.find(t => t.id === id);
   const x = useDraft((t0 ?? {}) as DocTemplate); const [vid, setVid] = useState(t0?.variants.find(v => v.isDefault)?.id ?? '');
+  const [mode, setMode] = useState<'edit' | 'preview'>('edit'); const [q, setQ] = useState(''); const [ren, setRen] = useState(false);
+  const refs = useRef<(HTMLInputElement | HTMLTextAreaElement | null)[]>([]); const focus = useRef(1); const pos = useRef<number[]>([]);
   if (!t0) return <><Head r="doctemplates" extra="Not found" back /><Empty>This template was removed.</Empty></>;
   const d = x.d; const v = d.variants.find(z => z.id === vid) ?? d.variants[0];
   const setV = (p: Partial<Variant>) => x.patch({ variants: d.variants.map(z => z.id === v.id ? { ...z, ...p } : z) });
   const bad = d.variants.flatMap(z => unknownTokens(z.title + ' ' + z.body + ' ' + z.footer));
-  const blocked = d.variants.some(z => !z.name.trim() || !z.title.trim() || !z.body.trim()) ? 'Every version needs a name, a heading and some wording.' : bad.length ? `These details don't exist: ${[...new Set(bad)].map(b => `{${b}}`).join(', ')}` : '';
-  const tokens = [...new Set([...tokensIn(t0.variants.map(z => z.title + z.body).join(' ')), 'full_name', 'address', 'date', 'amount', 'office_admin', 'office_phone'])].filter(k => k in TOKENS);
+  const blocked = d.variants.some(z => !z.name.trim() || !z.title.trim() || !z.body.trim()) ? 'Add a heading and some wording.' : bad.length ? `Unknown: ${[...new Set(bad)].map(b => `{${b}}`).join(', ')}` : '';
+  const used = tokensIn(t0.variants.map(z => z.title + z.body + z.footer).join(' ')).filter(k => k in TOKEN_LABEL);
+  const all = Object.keys(TOKEN_LABEL);
+  const list = q ? all.filter(k => TOKEN_LABEL[k].toLowerCase().includes(q.toLowerCase())) : [...new Set([...used, ...COMMON])].filter(k => k in TOKEN_LABEL);
+  const fields: { k: 'title' | 'body' | 'footer'; label: string }[] = [{ k: 'title', label: 'Heading' }, { k: 'body', label: 'Wording' }, { k: 'footer', label: 'Footer' }];
+  const change = (i: number, view: string, at: number | null) => { pos.current[i] = at ?? view.length; setV({ [fields[i].k]: toStore(view) } as Partial<Variant>); };
+  const insert = (k: string) => {
+    const i = focus.current; const view = toView(v[fields[i].k]); const at = pos.current[i] ?? view.length; const tok = `[${TOKEN_LABEL[k]}]`;
+    change(i, view.slice(0, at) + tok + view.slice(at), at + tok.length);
+    requestAnimationFrame(() => { const el = refs.current[i]; el?.focus(); el?.setSelectionRange(at + tok.length, at + tok.length); });
+  };
   const copy = () => { const n: Variant = { ...v, id: 'V' + Date.now(), name: `${v.name} (copy)`, isDefault: false }; x.patch({ variants: [...d.variants, n] }); setVid(n.id); };
   const sum = () => { const out: string[] = []; d.variants.forEach(z => { const o = t0.variants.find(q => q.id === z.id); if (!o) out.push(`Added “${z.name}”`); else if (JSON.stringify(o) !== JSON.stringify(z)) out.push(o.isDefault !== z.isDefault && z.isDefault ? `“${z.name}” is now the default` : `Changed “${z.name}”`); }); t0.variants.forEach(o => { if (!d.variants.find(z => z.id === o.id)) out.push(`Removed “${o.name}”`); }); return out; };
+  const grow = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } };
+  const bind = (i: number) => ({
+    ref: (el: HTMLInputElement | HTMLTextAreaElement | null) => { refs.current[i] = el; if (el instanceof HTMLTextAreaElement) grow(el); },
+    value: toView(v[fields[i].k]), 'aria-label': fields[i].label,
+    onFocus: () => { focus.current = i; },
+    onSelect: (e: React.SyntheticEvent<HTMLInputElement | HTMLTextAreaElement>) => { pos.current[i] = e.currentTarget.selectionStart ?? 0; },
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { change(i, e.target.value, e.target.selectionStart); if (e.target instanceof HTMLTextAreaElement) grow(e.target); },
+  });
   return <>
-    <Head r="doctemplates" extra={t0.name} title={t0.name} back action={<Btn kind="outline" icon={<Copy size={16} />} onClick={copy}>Add a version</Btn>} />
-    <PageTabs value={v.id} onChange={setVid} items={d.variants.map(z => ({ id: z.id, label: z.name + (z.isDefault ? ' · default' : '') }))} />
-    <div className="adm-split">
+    <Head r="doctemplates" extra={t0.name} title={t0.name} back />
+    <PageTabs value={mode} onChange={setMode} items={[{ id: 'edit', label: 'Edit' }, { id: 'preview', label: 'Preview' }]} />
+    <div className="adm-split tpl">
       <div className="col">
-        <Card title="This version" action={<div className="flex">{v.isDefault ? <Chip tone="ok">Default</Chip> : <Btn sm kind="outline" icon={<Star size={14} />} onClick={() => x.patch({ variants: d.variants.map(z => ({ ...z, isDefault: z.id === v.id })) })}>Make this the default</Btn>}
-          {!v.isDefault && <Btn sm kind="ghost" icon={<Trash2 size={14} />} onClick={() => { x.patch({ variants: d.variants.filter(z => z.id !== v.id) }); setVid(d.variants.find(z => z.isDefault)!.id); }}>Remove</Btn>}</div>}>
-          <Field label="Version name (staff see this)"><Text value={v.name} onChange={n => setV({ name: n })} /></Field>
-          <TokenFields key={v.id} tokens={tokens} fields={[{ label: 'Heading', value: v.title, set: t => setV({ title: t }) }, { label: 'Wording', value: v.body, set: t => setV({ body: t }), rows: 9 }, { label: 'Footer', value: v.footer, set: t => setV({ footer: t }) }]} />
-        </Card>
+        {mode === 'edit' ? <div className="docwrap pages"><div className="paper a4 edit">
+          <div className="doc-h"><img className="doc-logo" src={db.company.logo} alt="LSP" /><div className="stack" style={{ alignItems: 'flex-end' }}><span>1 Upper Street, London N1 0PQ</span><span>020 7946 0000 · hello@lsp.co.uk</span></div></div>
+          <input className="pin doc-title" placeholder="Heading" {...bind(0)} />
+          <textarea className="pin pin-body" rows={8} placeholder="Wording" {...bind(1)} />
+          <div className="doc-f"><input className="pin" placeholder="Footer" {...bind(2)} /><span style={{ flex: 'none' }}>Page 1 of 1</span></div>
+        </div></div>
+          : <Paper title={v.title} body={v.body} footer={v.footer} logo={db.company.logo} stamp={t0.name === 'Quote' && v.name.includes('approval') ? 'FOR APPROVAL' : undefined} />}
       </div>
-      <div className="sticky"><Card title="Preview with a sample record"><Paper title={v.title} body={v.body} footer={v.footer} logo={db.company.logo} stamp={t0.name === 'Quote' && v.name.includes('approval') ? 'FOR APPROVAL' : undefined} /></Card></div>
+      <div className="sticky">
+        <Card title="Version">
+          <div className="flex">
+            {d.variants.length > 1 ? <select className="input grow" aria-label="Version" value={v.id} onChange={e => setVid(e.target.value)}>{d.variants.map(z => <option key={z.id} value={z.id}>{z.name}{z.isDefault ? ' (default)' : ''}</option>)}</select> : <b className="grow">{v.name}</b>}
+            <MoreMenu label="···" items={[
+              { label: 'Rename', icon: <Pencil size={16} />, onClick: () => setRen(true) },
+              !v.isDefault && { label: 'Make default', icon: <Star size={16} />, onClick: () => x.patch({ variants: d.variants.map(z => ({ ...z, isDefault: z.id === v.id })) }) },
+              { label: 'Duplicate', icon: <Copy size={16} />, onClick: copy },
+              !v.isDefault && { label: 'Remove', icon: <Trash2 size={16} />, danger: true, onClick: () => { x.patch({ variants: d.variants.filter(z => z.id !== v.id) }); setVid(d.variants.find(z => z.isDefault)!.id); } },
+            ]} />
+          </div>
+          {v.isDefault && <div><Chip tone="ok">Default</Chip></div>}
+        </Card>
+        {mode === 'edit' && <Card title="Add a detail">
+          <MiniSearch value={q} onChange={setQ} placeholder="Search details" />
+          <div className="tokl">{list.map(k => <button key={k} type="button" onMouseDown={e => e.preventDefault()} onClick={() => insert(k)}><span>{TOKEN_LABEL[k]}</span><span className="caption">{TOKENS[k]}</span></button>)}
+            {!list.length && <span className="caption">Nothing found</span>}</div>
+        </Card>}
+      </div>
     </div>
-    <SaveBar dirty={x.dirty} onUndo={x.undo} blocked={blocked} note={x.dirty ? sum().join('; ') : 'Documents already sent keep the wording they were sent with.'}
+    <SaveBar dirty={x.dirty} onUndo={x.undo} blocked={blocked} note={x.dirty ? sum().join('; ') : undefined}
       onSave={() => s.commit('docTemplates', db.docTemplates.map(t => t.id === id ? { ...d, by: ME_NAME, at: nowStamp() } : t), { page: 'Document templates', item: t0.name, what: sum().join(', ') || 'Changed the wording', before: t0.variants.map(z => z.name + (z.isDefault ? ' (default)' : '')).join(', '), after: d.variants.map(z => z.name + (z.isDefault ? ' (default)' : '')).join(', ') })} />
+    {ren && <RenameModal name={v.name} onClose={() => setRen(false)} onDone={n => { setV({ name: n }); setRen(false); }} />}
   </>;
+}
+function RenameModal({ name, onClose, onDone }: { name: string; onClose: () => void; onDone: (n: string) => void }) {
+  const [n, setN] = useState(name);
+  return <Modal title="Rename version" onClose={onClose} footer={<><Btn kind="outline" onClick={onClose}>Cancel</Btn><Btn disabled={!n.trim()} onClick={() => onDone(n.trim())}>Rename</Btn></>}>
+    <Field label="Name"><Text value={n} onChange={setN} /></Field>
+  </Modal>;
 }

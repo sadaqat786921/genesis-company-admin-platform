@@ -22,7 +22,7 @@ const seed = (): Db => JSON.parse(JSON.stringify({
   onboarding: S.ONBOARDING, reminders: S.REMINDERS, templates: S.TEMPLATES, checklists: S.CHECKLISTS, processes: S.PROCESSES, picklists: S.PICKLISTS,
   docTypes: S.DOC_TYPES, agreements: S.AGREEMENTS, docTemplates: S.DOC_TEMPLATES, audit: S.AUDIT, broadcasts: S.BROADCASTS,
 }));
-const DB_KEY = 'genesis-ca-db-v4';
+const DB_KEY = 'genesis-ca-db-v5';
 const VIEW_KEY = 'genesis-ca-view-as';
 /** Pages a Sub Admin can never open, whatever the Admin ticks. */
 export const LOCKED_FOR_SUB: Partial<Record<Route, string>> = { subadmins: 'Only the main Admin creates Sub Admins and chooses their access. A Sub Admin can never give themselves more access.' };
